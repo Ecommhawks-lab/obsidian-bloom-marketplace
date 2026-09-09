@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Sign in | Obsidian Bloom</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital@0;1&family=Manrope:wght@300;400;600&display=swap" rel="stylesheet">
+<style>body{background:#131313;color:#e5e2e1;font-family:'Manrope',sans-serif}.serif{font-family:'Noto Serif',serif}
+input{background:transparent;border-bottom:1px solid #4d4635;padding:.6rem 0;width:100%;color:#e5e2e1}input:focus{outline:none;border-color:#f2ca50}
+.tab{padding:.5rem 1rem;font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#99907c;cursor:pointer;border-bottom:2px solid transparent}
+.tab.on{color:#f2ca50;border-color:#f2ca50}</style>
+</head>
+<body class="min-h-screen flex items-center justify-center px-5">
+<div class="w-full max-w-sm">
+  <div class="text-center mb-10"><span class="serif text-2xl text-[#f2ca50]">Obsidian Bloom</span><p class="text-xs text-[#99907c] uppercase tracking-widest mt-2">Merchant Portal</p></div>
+  <div class="flex gap-4 justify-center mb-8">
+    <span class="tab on" data-tab="vendor">Vendor</span>
+    <span class="tab" data-tab="admin">Admin</span>
+  </div>
+  <form id="form" class="space-y-6">
+    <input id="email" type="email" placeholder="Email" required>
+    <input id="password" type="password" placeholder="Password" required>
+    <button class="w-full py-3 rounded-full bg-[#f2ca50] text-[#3c2f00] font-semibold hover:opacity-90 transition">Sign in</button>
+  </form>
+  <p id="msg" class="text-center text-xs mt-4 h-4"></p>
+  <p id="signupLink" class="text-center text-xs text-[#99907c] mt-6">No vendor account? <a class="text-[#f2ca50]" href="/signup">Create one</a></p>
+</div>
+<script>
+  var tab = 'vendor';
+  document.querySelectorAll('.tab').forEach(function (t) {
+    t.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('on'); });
+      t.classList.add('on'); tab = t.dataset.tab;
+      document.getElementById('signupLink').style.display = tab === 'vendor' ? '' : 'none';
+    });
+  });
+  document.getElementById('form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var msg = document.getElementById('msg'); msg.textContent = '…'; msg.style.color = '#99907c';
+    var url = tab === 'admin' ? '/auth/admin-login' : '/auth/login';
+    try {
+      var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.value, password: password.value }) });
+      var j = await r.json();
+      if (!j.ok) throw new Error(j.error || 'Failed');
+      location.href = tab === 'admin' ? '/admin' : '/dashboard';
+    } catch (err) { msg.textContent = err.message; msg.style.color = '#ffb4ab'; }
+  });
+</script>
+</body></html>
