@@ -3,7 +3,7 @@
  * Vendors sign up, publish products attributed to them (Shopify vendor field +
  * custom.vendor_id metafield, created as DRAFT), an admin approves them, and
  * Stripe Connect handles payouts with an earnings ledger fed by an orders webhook.
- * See README.md — including the payout funding caveat.
+ * Data is stored in Turso (libSQL) so it persists on free hosting. See README.md.
  */
 import express from 'express';
 import cookieParser from 'cookie-parser';
@@ -12,7 +12,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-import db from './db.mjs';
+import { get, all, run, initDb } from './db.mjs';
 import { hashPassword, verifyPassword, issue, clear, requireVendor, requireAdmin, readSession } from './auth.mjs';
 import { createVendorProduct, setProductStatus, SHOP } from './shopify.mjs';
 import { stripeEnabled, ensureAccount, onboardingLink, accountStatus, payout } from './stripe_helper.mjs';
@@ -34,25 +34,29 @@ app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 /* ----------------------------- Auth ----------------------------- */
-app.post('/auth/signup', (req, res) => {
-  const { email, password, business_name, vat } = req.body || {};
-  if (!email || !password || !business_name) return res.status(400).json({ ok: false, error: 'Email, password and business name are required.' });
-  if (String(password).length < 8) return res.status(400).json({ ok: false, error: 'Password must be at least 8 characters.' });
-  const exists = db.prepare('SELECT id FROM vendors WHERE email = ?').get(String(email).toLowerCase());
-  if (exists) return res.status(409).json({ ok: false, error: 'That email is already registered.' });
-  const info = db.prepare('INSERT INTO vendors (email, password_hash, business_name, vat) VALUES (?,?,?,?)')
-    .run(String(email).toLowerCase(), hashPassword(password), business_name.trim(), (vat || '').trim());
-  issue(res, { role: 'vendor', vid: info.lastInsertRowid });
-  res.json({ ok: true });
+app.post('/auth/signup', async (req, res) => {
+  try {
+    const { email, password, business_name, vat } = req.body || {};
+    if (!email || !password || !business_name) return res.status(400).json({ ok: false, error: 'Email, password and business name are required.' });
+    if (String(password).length < 8) return res.status(400).json({ ok: false, error: 'Password must be at least 8 characters.' });
+    const exists = await get('SELECT id FROM vendors WHERE email = ?', [String(email).toLowerCase()]);
+    if (exists) return res.status(409).json({ ok: false, error: 'That email is already registered.' });
+    const info = await run('INSERT INTO vendors (email, password_hash, business_name, vat) VALUES (?,?,?,?)',
+      [String(email).toLowerCase(), hashPassword(password), business_name.trim(), (vat || '').trim()]);
+    issue(res, { role: 'vendor', vid: info.lastInsertRowid });
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
-app.post('/auth/login', (req, res) => {
-  const { email, password } = req.body || {};
-  const v = db.prepare('SELECT * FROM vendors WHERE email = ?').get(String(email || '').toLowerCase());
-  if (!v || !verifyPassword(password || '', v.password_hash)) return res.status(401).json({ ok: false, error: 'Invalid email or password.' });
-  if (v.status !== 'active') return res.status(403).json({ ok: false, error: 'Account is disabled.' });
-  issue(res, { role: 'vendor', vid: v.id });
-  res.json({ ok: true });
+app.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    const v = await get('SELECT * FROM vendors WHERE email = ?', [String(email || '').toLowerCase()]);
+    if (!v || !verifyPassword(password || '', v.password_hash)) return res.status(401).json({ ok: false, error: 'Invalid email or password.' });
+    if (v.status !== 'active') return res.status(403).json({ ok: false, error: 'Account is disabled.' });
+    issue(res, { role: 'vendor', vid: v.id });
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
 app.post('/auth/admin-login', (req, res) => {
@@ -64,18 +68,20 @@ app.post('/auth/admin-login', (req, res) => {
 
 app.post('/auth/logout', (req, res) => { clear(res); res.json({ ok: true }); });
 
-app.get('/api/me', (req, res) => {
-  const s = readSession(req);
-  if (!s) return res.json({ ok: true, session: null });
-  if (s.role === 'admin') return res.json({ ok: true, session: { role: 'admin' } });
-  const v = db.prepare('SELECT id, email, business_name, vat, stripe_account_id FROM vendors WHERE id = ?').get(s.vid);
-  res.json({ ok: true, session: v ? { role: 'vendor', ...v } : null, stripeEnabled });
+app.get('/api/me', async (req, res) => {
+  try {
+    const s = readSession(req);
+    if (!s) return res.json({ ok: true, session: null });
+    if (s.role === 'admin') return res.json({ ok: true, session: { role: 'admin' } });
+    const v = await get('SELECT id, email, business_name, vat, stripe_account_id FROM vendors WHERE id = ?', [s.vid]);
+    res.json({ ok: true, session: v ? { role: 'vendor', ...v } : null, stripeEnabled });
+  } catch (e) { console.error(e); res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
 /* --------------------------- Vendor: products --------------------------- */
 app.post('/api/publish', requireVendor, upload.single('image'), async (req, res) => {
   try {
-    const vendor = db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.vendorId);
+    const vendor = await get('SELECT * FROM vendors WHERE id = ?', [req.vendorId]);
     const name = (req.body.name || '').trim();
     if (!name) return res.status(400).json({ ok: false, error: 'Bouquet name is required.' });
     const price = (req.body.price || '0').trim();
@@ -85,33 +91,37 @@ app.post('/api/publish', requireVendor, upload.single('image'), async (req, res)
       price, stem: (req.body.stem_density || '').trim(), file: req.file,
     });
 
-    db.prepare('INSERT INTO products (vendor_id, shopify_product_id, shopify_product_gid, title, price, status) VALUES (?,?,?,?,?,?)')
-      .run(vendor.id, result.id, result.gid, name, Number(price || 0).toFixed(2), 'pending');
+    await run('INSERT INTO products (vendor_id, shopify_product_id, shopify_product_gid, title, price, status) VALUES (?,?,?,?,?,?)',
+      [vendor.id, result.id, result.gid, name, Number(price || 0).toFixed(2), 'pending']);
 
     res.json({ ok: true, ...result });
   } catch (e) { console.error(e); res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
-app.get('/api/my-products', requireVendor, (req, res) => {
-  const rows = db.prepare('SELECT id, title, price, status, created_at FROM products WHERE vendor_id = ? ORDER BY id DESC').all(req.vendorId);
-  res.json({ ok: true, products: rows });
+app.get('/api/my-products', requireVendor, async (req, res) => {
+  try {
+    const rows = await all('SELECT id, title, price, status, created_at FROM products WHERE vendor_id = ? ORDER BY id DESC', [req.vendorId]);
+    res.json({ ok: true, products: rows });
+  } catch (e) { console.error(e); res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
 /* --------------------------- Vendor: merchant identity --------------------------- */
-app.post('/api/merchant', requireVendor, (req, res) => {
-  const { business_name, vat } = req.body || {};
-  db.prepare('UPDATE vendors SET business_name = COALESCE(?, business_name), vat = COALESCE(?, vat) WHERE id = ?')
-    .run(business_name ? business_name.trim() : null, vat != null ? vat.trim() : null, req.vendorId);
-  res.json({ ok: true });
+app.post('/api/merchant', requireVendor, async (req, res) => {
+  try {
+    const { business_name, vat } = req.body || {};
+    await run('UPDATE vendors SET business_name = COALESCE(?, business_name), vat = COALESCE(?, vat) WHERE id = ?',
+      [business_name ? business_name.trim() : null, vat != null ? vat.trim() : null, req.vendorId]);
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
 /* --------------------------- Vendor: Stripe Connect --------------------------- */
 app.post('/api/stripe/connect', requireVendor, async (req, res) => {
   try {
     if (!stripeEnabled) return res.status(400).json({ ok: false, error: 'Stripe is not configured on the server.' });
-    const vendor = db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.vendorId);
+    const vendor = await get('SELECT * FROM vendors WHERE id = ?', [req.vendorId]);
     const acctId = await ensureAccount(vendor);
-    if (acctId !== vendor.stripe_account_id) db.prepare('UPDATE vendors SET stripe_account_id = ? WHERE id = ?').run(acctId, vendor.id);
+    if (acctId !== vendor.stripe_account_id) await run('UPDATE vendors SET stripe_account_id = ? WHERE id = ?', [acctId, vendor.id]);
     const url = await onboardingLink(acctId, BASE_URL);
     res.json({ ok: true, url });
   } catch (e) { console.error(e); res.status(500).json({ ok: false, error: String(e.message || e) }); }
@@ -119,60 +129,64 @@ app.post('/api/stripe/connect', requireVendor, async (req, res) => {
 
 app.get('/api/stripe/status', requireVendor, async (req, res) => {
   try {
-    const v = db.prepare('SELECT stripe_account_id FROM vendors WHERE id = ?').get(req.vendorId);
+    const v = await get('SELECT stripe_account_id FROM vendors WHERE id = ?', [req.vendorId]);
     res.json({ ok: true, enabled: stripeEnabled, ...(await accountStatus(v.stripe_account_id)) });
   } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
 /* --------------------------- Admin --------------------------- */
-app.get('/api/admin/products', requireAdmin, (req, res) => {
-  const rows = db.prepare(`
-    SELECT p.id, p.title, p.price, p.status, p.shopify_product_id, p.created_at, v.business_name, v.email
-    FROM products p JOIN vendors v ON v.id = p.vendor_id ORDER BY p.id DESC`).all();
-  res.json({ ok: true, products: rows });
+app.get('/api/admin/products', requireAdmin, async (req, res) => {
+  try {
+    const rows = await all(`
+      SELECT p.id, p.title, p.price, p.status, p.shopify_product_id, p.created_at, v.business_name, v.email
+      FROM products p JOIN vendors v ON v.id = p.vendor_id ORDER BY p.id DESC`);
+    res.json({ ok: true, products: rows });
+  } catch (e) { console.error(e); res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
 app.post('/api/admin/products/:id/:action', requireAdmin, async (req, res) => {
   try {
     const { id, action } = req.params;
-    const row = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
+    const row = await get('SELECT * FROM products WHERE id = ?', [id]);
     if (!row) return res.status(404).json({ ok: false, error: 'Not found.' });
     if (action === 'approve') {
       await setProductStatus(row.shopify_product_gid, 'ACTIVE');
-      db.prepare('UPDATE products SET status = ? WHERE id = ?').run('approved', id);
+      await run('UPDATE products SET status = ? WHERE id = ?', ['approved', id]);
     } else if (action === 'reject') {
       await setProductStatus(row.shopify_product_gid, 'DRAFT');
-      db.prepare('UPDATE products SET status = ? WHERE id = ?').run('rejected', id);
+      await run('UPDATE products SET status = ? WHERE id = ?', ['rejected', id]);
     } else return res.status(400).json({ ok: false, error: 'Unknown action.' });
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
-app.get('/api/admin/earnings', requireAdmin, (req, res) => {
-  const rows = db.prepare(`
-    SELECT v.id vendor_id, v.business_name, v.email, v.stripe_account_id,
-           COALESCE(SUM(CASE WHEN e.paid_out=0 THEN e.net_cents ELSE 0 END),0) owed_cents,
-           COALESCE(SUM(e.net_cents),0) total_cents, e.currency
-    FROM vendors v LEFT JOIN earnings e ON e.vendor_id = v.id
-    GROUP BY v.id ORDER BY owed_cents DESC`).all();
-  res.json({ ok: true, vendors: rows, commission: COMMISSION });
+app.get('/api/admin/earnings', requireAdmin, async (req, res) => {
+  try {
+    const rows = await all(`
+      SELECT v.id vendor_id, v.business_name, v.email, v.stripe_account_id,
+             COALESCE(SUM(CASE WHEN e.paid_out=0 THEN e.net_cents ELSE 0 END),0) owed_cents,
+             COALESCE(SUM(e.net_cents),0) total_cents, e.currency
+      FROM vendors v LEFT JOIN earnings e ON e.vendor_id = v.id
+      GROUP BY v.id ORDER BY owed_cents DESC`);
+    res.json({ ok: true, vendors: rows, commission: COMMISSION });
+  } catch (e) { console.error(e); res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
 app.post('/api/admin/payout/:vendorId', requireAdmin, async (req, res) => {
   try {
     if (!stripeEnabled) return res.status(400).json({ ok: false, error: 'Stripe not configured.' });
-    const v = db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.vendorId);
+    const v = await get('SELECT * FROM vendors WHERE id = ?', [req.params.vendorId]);
     if (!v?.stripe_account_id) return res.status(400).json({ ok: false, error: 'Vendor has not connected Stripe.' });
-    const agg = db.prepare("SELECT COALESCE(SUM(net_cents),0) owed, currency FROM earnings WHERE vendor_id = ? AND paid_out = 0").get(v.id);
+    const agg = await get("SELECT COALESCE(SUM(net_cents),0) owed, currency FROM earnings WHERE vendor_id = ? AND paid_out = 0", [v.id]);
     if (!agg.owed) return res.status(400).json({ ok: false, error: 'Nothing owed.' });
     await payout(v.stripe_account_id, agg.owed, agg.currency || 'usd');
-    db.prepare('UPDATE earnings SET paid_out = 1 WHERE vendor_id = ? AND paid_out = 0').run(v.id);
+    await run('UPDATE earnings SET paid_out = 1 WHERE vendor_id = ? AND paid_out = 0', [v.id]);
     res.json({ ok: true, paid_cents: agg.owed });
   } catch (e) { console.error(e); res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
 /* --------------------------- Shopify orders webhook --------------------------- */
-app.post('/webhooks/orders', (req, res) => {
+app.post('/webhooks/orders', async (req, res) => {
   try {
     if (WEBHOOK_SECRET) {
       const hmac = req.get('X-Shopify-Hmac-Sha256') || '';
@@ -185,16 +199,16 @@ app.post('/webhooks/orders', (req, res) => {
     for (const li of order.line_items || []) {
       const pid = li.product_id ? String(li.product_id) : null;
       if (!pid) continue;
-      const prod = db.prepare('SELECT vendor_id FROM products WHERE shopify_product_id = ?').get(pid);
+      const prod = await get('SELECT vendor_id FROM products WHERE shopify_product_id = ?', [pid]);
       if (!prod) continue;
       const cents = Math.round(Number(li.price) * 100) * Number(li.quantity || 1);
       perVendor[prod.vendor_id] = (perVendor[prod.vendor_id] || 0) + cents;
     }
-    const stmt = db.prepare(`INSERT OR IGNORE INTO earnings (vendor_id, order_id, gross_cents, commission_cents, net_cents, currency)
-                             VALUES (?,?,?,?,?,?)`);
     for (const [vid, gross] of Object.entries(perVendor)) {
       const commission = Math.round(gross * (COMMISSION / 100));
-      stmt.run(Number(vid), String(order.id), gross, commission, gross - commission, currency);
+      await run(`INSERT OR IGNORE INTO earnings (vendor_id, order_id, gross_cents, commission_cents, net_cents, currency)
+                 VALUES (?,?,?,?,?,?)`,
+        [Number(vid), String(order.id), gross, commission, gross - commission, currency]);
     }
     res.status(200).send('ok');
   } catch (e) { console.error('webhook', e); res.status(200).send('ok'); } // 200 so Shopify doesn't retry-storm
@@ -219,4 +233,7 @@ app.get('/admin', (req, res) => {
 });
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.listen(PORT, () => console.log(`Obsidian Bloom marketplace: ${BASE_URL}  (shop: ${SHOP}, stripe: ${stripeEnabled ? 'on' : 'off'})`));
+// Create tables, then start listening.
+initDb()
+  .then(() => app.listen(PORT, () => console.log(`Obsidian Bloom marketplace: ${BASE_URL}  (shop: ${SHOP}, stripe: ${stripeEnabled ? 'on' : 'off'})`)))
+  .catch((e) => { console.error('Failed to initialize database:', e); process.exit(1); });

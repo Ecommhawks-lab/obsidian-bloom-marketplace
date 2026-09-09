@@ -11,25 +11,28 @@ A working multi-tenant marketplace on **one** Shopify store. Vendors (florists) 
 
 ## Stack
 
-Node 18–22, Express, SQLite (`better-sqlite3`), JWT cookie sessions, bcrypt, Stripe SDK. No build step. Files: `server.mjs` (routes), `db.mjs`, `auth.mjs`, `shopify.mjs`, `stripe_helper.mjs`, `public/` (login, signup, dashboard, admin).
+Node 18–22, Express, Turso/libSQL (`@libsql/client`) for storage, JWT cookie sessions, bcrypt, Stripe SDK. No build step, no native modules. Files: `server.mjs` (routes), `db.mjs`, `auth.mjs`, `shopify.mjs`, `stripe_helper.mjs`, `public/` (login, signup, dashboard, admin).
+
+The database is **Turso** (a hosted, SQLite-compatible service). Its free tier is persistent and never expires, so vendor accounts, products, and earnings survive restarts and redeploys — which means the whole app can run on a **free** host that has an ephemeral filesystem.
 
 ## Setup
 
 1. **Shopify custom app** → Settings → Apps → Develop apps → create app → Admin API scopes `write_products`, `read_products` → install → copy the `shpat_` token.
-2. Configure and run:
+2. **Turso database (free)** → create an account at https://turso.tech → create a database → copy its **URL** (`libsql://...`) and create an **auth token**. Set them as `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`.
+3. Configure and run:
    ```bash
    cd obsidian-bloom-marketplace
-   cp .env.example .env      # fill SHOP, ADMIN_TOKEN, JWT_SECRET, ADMIN_EMAIL/PASSWORD
+   cp .env.example .env      # fill SHOP, ADMIN_TOKEN, JWT_SECRET, ADMIN_EMAIL/PASSWORD, TURSO_*
    npm install
    npm start                 # http://localhost:8890
    ```
-   `/signup` (vendor), `/login` (vendor or admin tab), `/admin` (store owner).
+   Tables are created automatically on first start. `/signup` (vendor), `/login` (vendor or admin tab), `/admin` (store owner).
 3. **Stripe (optional):** set `STRIPE_SECRET` to enable "Connect Stripe" + payouts. Uses Stripe Connect **Express** accounts.
 4. **Orders webhook (optional):** in Shopify admin → Settings → Notifications → Webhooks, add an **Order creation** webhook (JSON) to `https://YOUR_HOST/webhooks/orders`, and put its signing secret in `SHOPIFY_WEBHOOK_SECRET`. This populates the earnings ledger.
 
-## Hosting
+## Hosting (free)
 
-Deploy to any Node host (Render, Railway, Fly, VPS). Set the same env vars, set `NODE_ENV=production` and `BASE_URL=https://your-domain` (enables secure cookies and correct Stripe return links). Persist the SQLite file (`DB_PATH`) on a volume, or swap `db.mjs` to Postgres for scale.
+Deploy the Docker image to any Node host. On **Render's free plan** it runs at no cost: the instance sleeps after ~15 min idle and cold-starts in ~1 min, but because all data lives in Turso, nothing is lost across sleeps, restarts, or redeploys. Set the same env vars, plus `NODE_ENV=production` and `BASE_URL=https://your-domain` (secure cookies + correct Stripe return links). No persistent disk is required.
 
 ## ⚠️ The payout funding caveat (read this)
 

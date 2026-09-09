@@ -1,18 +1,13 @@
 # One-click deploy on Render (render.com). Push the folder to a Git repo,
-# then "New + > Blueprint" and point it at this file.
+# then "New + > Blueprint" and point it at this file. Data lives in Turso, so
+# this runs fine on the FREE plan with no persistent disk.
 services:
   - type: web
     name: obsidian-bloom-marketplace
     runtime: docker
-    plan: starter
+    plan: free
     healthCheckPath: /login
-    disk:
-      name: data
-      mountPath: /data
-      sizeGB: 1
     envVars:
-      - key: DB_PATH
-        value: /data/data.sqlite
       - key: NODE_ENV
         value: production
       - key: API_VERSION
@@ -23,6 +18,11 @@ services:
         value: "15"
       # BASE_URL: set to your Render URL after first deploy, e.g. https://obsidian-bloom-marketplace.onrender.com
       - key: BASE_URL
+        sync: false
+      # Turso database (free, persistent) — create at https://turso.tech
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
         sync: false
       # Secrets — set these in the Render dashboard (never commit them)
       - key: SHOP
