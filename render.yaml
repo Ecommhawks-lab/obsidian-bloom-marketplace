@@ -1,0 +1,41 @@
+# One-click deploy on Render (render.com). Push the folder to a Git repo,
+# then "New + > Blueprint" and point it at this file.
+services:
+  - type: web
+    name: obsidian-bloom-marketplace
+    runtime: docker
+    plan: starter
+    healthCheckPath: /login
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DB_PATH
+        value: /data/data.sqlite
+      - key: NODE_ENV
+        value: production
+      - key: API_VERSION
+        value: "2024-10"
+      - key: PRODUCT_TYPE
+        value: Bouquet
+      - key: PLATFORM_COMMISSION_PCT
+        value: "15"
+      # BASE_URL: set to your Render URL after first deploy, e.g. https://obsidian-bloom-marketplace.onrender.com
+      - key: BASE_URL
+        sync: false
+      # Secrets — set these in the Render dashboard (never commit them)
+      - key: SHOP
+        sync: false
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: STRIPE_SECRET
+        sync: false
+      - key: SHOPIFY_WEBHOOK_SECRET
+        sync: false

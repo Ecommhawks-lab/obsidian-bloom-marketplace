@@ -1,0 +1,22 @@
+{
+  "name": "obsidian-bloom-marketplace",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Multi-tenant vendor marketplace on one Shopify store: vendors sign up, publish products attributed to them, admin approves, Stripe Connect payouts.",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18 <=22"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "stripe": "^16.12.0"
+  }
+}
