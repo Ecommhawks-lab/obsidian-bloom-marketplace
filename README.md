@@ -1,51 +1,44 @@
 # Obsidian Bloom — Multi-Vendor Marketplace
 
-A working multi-tenant marketplace on **one** Shopify store. Vendors (florists) sign up and log in, publish products **attributed to them**, an **admin** reviews and approves, and **Stripe Connect** handles vendor payouts backed by an earnings ledger fed by a Shopify orders webhook.
+A working multi-tenant marketplace on **one** Shopify store, running on **Cloudflare Workers** with a **Turso** database. Vendors (florists) sign up and log in, publish products **attributed to them**, an **admin** reviews and approves, and **Stripe Connect** handles vendor payouts backed by an earnings ledger fed by a Shopify orders webhook.
 
 ## Roles & flow
 
 1. **Vendor** signs up → `/dashboard` → uploads a bouquet (image, name, narrative, price, stem density) → **Publish**. A **draft** product is created in your Shopify store with `vendor = business name`, tag `vendor:<id>`, and metafield `custom.vendor_id`. It shows in *My Collection* as **pending**.
 2. **Admin** (store owner) logs in → `/admin` → sees every submission → **Approve** (sets the Shopify product to ACTIVE) or **Reject** (keeps it DRAFT).
 3. Orders come in → Shopify fires the **orders webhook** → the app records each vendor's net earnings (gross − commission) in the ledger.
-4. **Vendor** connects **Stripe** on their dashboard. Admin sees amounts owed and hits **Pay out**, which creates a Stripe transfer to the vendor's connected account and marks those earnings paid.
+4. **Vendor** connects **Stripe** on their dashboard. Admin sees amounts owed and hits **Pay out**.
 
 ## Stack
 
-Node 18–22, Express, Turso/libSQL (`@libsql/client`) for storage, JWT cookie sessions, bcrypt, Stripe SDK. No build step, no native modules. Files: `server.mjs` (routes), `db.mjs`, `auth.mjs`, `shopify.mjs`, `stripe_helper.mjs`, `public/` (login, signup, dashboard, admin).
+Cloudflare Workers + **Hono** (router), **Turso/libSQL** (`@libsql/client/web`) for storage, **jose** JWT cookie sessions, **Web Crypto PBKDF2** password hashing, and plain-`fetch` calls to the Shopify Admin GraphQL API and Stripe. No Node server, no Docker — it runs on the Workers runtime. Files: `src/worker.mjs` (routes), `src/db.mjs`, `src/auth.mjs`, `src/shopify.mjs`, `src/stripe.mjs`, `public/` (login, signup, dashboard, admin — bundled as text), `wrangler.jsonc`.
 
-The database is **Turso** (a hosted, SQLite-compatible service). Its free tier is persistent and never expires, so vendor accounts, products, and earnings survive restarts and redeploys — which means the whole app can run on a **free** host that has an ephemeral filesystem.
+Why this stack: Cloudflare Workers' free tier is genuinely free (no card, no expiry) and allows commercial use, and Turso's free tier is persistent — so the whole marketplace runs at **$0** with data that survives restarts.
 
-## Setup
+## Configuration
 
-1. **Shopify custom app** → Settings → Apps → Develop apps → create app → Admin API scopes `write_products`, `read_products` → install → copy the `shpat_` token.
-2. **Turso database (free)** → create an account at https://turso.tech → create a database → copy its **URL** (`libsql://...`) and create an **auth token**. Set them as `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`.
-3. Configure and run:
-   ```bash
-   cd obsidian-bloom-marketplace
-   cp .env.example .env      # fill SHOP, ADMIN_TOKEN, JWT_SECRET, ADMIN_EMAIL/PASSWORD, TURSO_*
-   npm install
-   npm start                 # http://localhost:8890
-   ```
-   Tables are created automatically on first start. `/signup` (vendor), `/login` (vendor or admin tab), `/admin` (store owner).
-3. **Stripe (optional):** set `STRIPE_SECRET` to enable "Connect Stripe" + payouts. Uses Stripe Connect **Express** accounts.
-4. **Orders webhook (optional):** in Shopify admin → Settings → Notifications → Webhooks, add an **Order creation** webhook (JSON) to `https://YOUR_HOST/webhooks/orders`, and put its signing secret in `SHOPIFY_WEBHOOK_SECRET`. This populates the earnings ledger.
+Non-secret config is in `wrangler.jsonc` → `vars` (`SHOP`, `API_VERSION`, `PRODUCT_TYPE`, `PLATFORM_COMMISSION_PCT`).
 
-## Hosting (free)
+Secrets are set in the Cloudflare dashboard (Workers → your worker → Settings → Variables and Secrets → **Secret**) or via `npx wrangler secret put <NAME>`:
+`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `ADMIN_TOKEN`, `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and optionally `STRIPE_SECRET`, `SHOPIFY_WEBHOOK_SECRET`. See `.env.example`.
 
-Deploy the Docker image to any Node host. On **Render's free plan** it runs at no cost: the instance sleeps after ~15 min idle and cold-starts in ~1 min, but because all data lives in Turso, nothing is lost across sleeps, restarts, or redeploys. Set the same env vars, plus `NODE_ENV=production` and `BASE_URL=https://your-domain` (secure cookies + correct Stripe return links). No persistent disk is required.
+## Deploy
+
+**Option A — Git (no CLI):** push this repo to GitHub, then in the Cloudflare dashboard: Workers → Create → **Connect to Git**, pick the repo. Cloudflare runs `npm ci` and `npx wrangler deploy`. Add the secrets above in the Worker's settings and redeploy.
+
+**Option B — CLI:** `npm install` then `npx wrangler deploy`. Set secrets with `npx wrangler secret put <NAME>`.
+
+Tables are created automatically on first request. Routes: `/signup` (vendor), `/login` (vendor or admin tab), `/dashboard`, `/admin`.
+
+### Orders webhook (optional, for the earnings ledger)
+In Shopify admin → Settings → Notifications → Webhooks, add an **Order creation** webhook (JSON) to `https://YOUR_WORKER_URL/webhooks/orders`, and set `SHOPIFY_WEBHOOK_SECRET` to its signing secret.
 
 ## ⚠️ The payout funding caveat (read this)
 
-Money from a **Shopify checkout** lands in the store's **Shopify Payments** balance — **not** in your Stripe platform balance. So a Stripe `transfer` to a vendor only succeeds if your Stripe platform account actually holds funds. Practical options:
-
-- **Manual reconciliation (this app, as-is):** use the earnings ledger + "amount owed" per vendor as the source of truth, top up / fund your Stripe balance, then pay out. Correct amounts, semi-automatic.
-- **Take payment through Stripe instead of Shopify checkout** (Stripe as the marketplace processor) — then `transfer`/`application_fee` splits are fully automatic. Bigger change.
-- **Use a Shopify-native payout app** (Shopify Collective, Webkul Multivendor) if you want Shopify to move the money.
-
-The app never stores raw bank details — payout data lives only in Stripe (PCI-compliant).
+Money from a **Shopify checkout** lands in the store's **Shopify Payments** balance — **not** in your Stripe platform balance. A Stripe `transfer` to a vendor only succeeds if your Stripe platform account holds funds. Options: manual reconciliation using the earnings ledger as the source of truth (this app, as-is); take payment through Stripe instead of Shopify checkout (bigger change); or use a Shopify-native payout app. The app never stores raw bank details — payout data lives only in Stripe.
 
 ## Notes
 
-- Products publish as **draft** until an admin approves (change `'DRAFT'`→`'ACTIVE'` in `shopify.mjs` for auto-publish).
+- Products publish as **draft** until an admin approves (change `'DRAFT'`→`'ACTIVE'` in `src/shopify.mjs` for auto-publish).
 - Single Shopify store, many app-level vendor accounts. Vendors authenticate against this app (not Shopify OAuth) since they aren't store staff.
-- Commission set by `PLATFORM_COMMISSION_PCT`. Webhook is idempotent per (vendor, order).
+- Commission set by `PLATFORM_COMMISSION_PCT`. The webhook is idempotent per (vendor, order).

@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "obsidian-bloom-marketplace",
+  "main": "worker.mjs",
+  "compatibility_date": "2024-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // Bundle the HTML pages as text imports (served by the Worker).
+  "rules": [
+    { "type": "Text", "globs": ["**/*.html"], "fallthrough": false }
+  ],
+
+  // Non-sensitive config only. This file is committed to a PUBLIC repo,
+  // so secrets (JWT_SECRET, ADMIN_TOKEN, ADMIN_EMAIL, ADMIN_PASSWORD,
+  // TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, STRIPE_SECRET,
+  // SHOPIFY_WEBHOOK_SECRET) are set as encrypted secrets in the
+  // Cloudflare dashboard, never here.
+  "vars": {
+    "SHOP": "flowersmarketplace.myshopify.com",
+    "API_VERSION": "2024-10",
+    "PRODUCT_TYPE": "Bouquet",
+    "PLATFORM_COMMISSION_PCT": "15"
+  }
+}
