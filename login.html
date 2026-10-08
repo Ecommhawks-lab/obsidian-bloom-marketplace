@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport">
+<meta name="theme-color" content="#131313">
+<title>Sign in | Obsidian Bloom</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital@0;1&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{color-scheme:dark}
+  *{-webkit-tap-highlight-color:transparent}
+  body{background:#131313;color:#e5e2e1;font-family:'Manrope',sans-serif}
+  .serif{font-family:'Noto Serif',serif}
+  .bg-aura{background:
+    radial-gradient(60rem 60rem at 50% -10%,rgba(242,202,80,.10),transparent 60%),
+    radial-gradient(40rem 40rem at 100% 100%,rgba(255,188,212,.06),transparent 60%),#131313}
+  .field{width:100%;background:#1c1b1b;border:1px solid #302d26;border-radius:14px;padding:.95rem 1rem;color:#e5e2e1;font-size:16px;transition:border-color .15s,box-shadow .15s}
+  .field::placeholder{color:#6f685a}
+  .field:focus{outline:none;border-color:#f2ca50;box-shadow:0 0 0 3px rgba(242,202,80,.15)}
+  .tab{flex:1;text-align:center;padding:.7rem 1rem;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#99907c;cursor:pointer;border-radius:10px;transition:.15s;user-select:none}
+  .tab.on{color:#14110f;background:#f2ca50;font-weight:600}
+  .btn-gold{width:100%;min-height:52px;border-radius:9999px;background:linear-gradient(90deg,#f2ca50,#d4af37);color:#3c2f00;font-weight:700;font-size:15px;transition:.15s}
+  .btn-gold:hover{filter:brightness(1.05)}.btn-gold:active{transform:scale(.985)}.btn-gold:disabled{opacity:.6}
+</style>
+</head>
+<body class="bg-aura min-h-screen flex items-center justify-center p-5" style="min-height:100dvh">
+  <div class="w-full max-w-[400px]">
+    <div class="text-center mb-8">
+      <span class="serif text-3xl sm:text-4xl text-[#f2ca50]">Obsidian Bloom</span>
+      <p class="text-[11px] text-[#99907c] uppercase tracking-[0.3em] mt-3">Merchant Portal</p>
+    </div>
+
+    <div class="bg-[#17110a]/40 border border-[#D4AF37]/15 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur">
+      <div class="flex gap-2 p-1 mb-7 bg-[#0e0e0e] rounded-xl">
+        <span class="tab on" data-tab="vendor">Vendor</span>
+        <span class="tab" data-tab="admin">Admin</span>
+      </div>
+      <form id="form" class="space-y-4">
+        <div>
+          <label for="email" class="block text-[11px] uppercase tracking-widest text-[#99907c] mb-2">Email</label>
+          <input id="email" class="field" type="email" placeholder="you@example.com" autocomplete="email" required>
+        </div>
+        <div>
+          <label for="password" class="block text-[11px] uppercase tracking-widest text-[#99907c] mb-2">Password</label>
+          <input id="password" class="field" type="password" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <button class="btn-gold mt-2">Sign in</button>
+      </form>
+      <p id="msg" class="text-center text-sm mt-4 min-h-[20px]"></p>
+    </div>
+
+    <p id="signupLink" class="text-center text-sm text-[#99907c] mt-6">New florist? <a class="text-[#f2ca50] font-medium" href="/signup">Create a vendor account</a></p>
+  </div>
+<script>
+  var tab = 'vendor';
+  document.querySelectorAll('.tab').forEach(function (t) {
+    t.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('on'); });
+      t.classList.add('on'); tab = t.dataset.tab;
+      document.getElementById('signupLink').style.display = tab === 'vendor' ? '' : 'none';
+    });
+  });
+  document.getElementById('form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var msg = document.getElementById('msg'); msg.textContent = 'Signing in…'; msg.style.color = '#99907c';
+    var url = tab === 'admin' ? '/auth/admin-login' : '/auth/login';
+    try {
+      var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.value, password: password.value }) });
+      var j = await r.json();
+      if (!j.ok) throw new Error(j.error || 'Failed');
+      location.href = tab === 'admin' ? '/admin' : '/dashboard';
+    } catch (err) { msg.textContent = err.message; msg.style.color = '#ffb4ab'; }
+  });
+</script>
+</body></html>

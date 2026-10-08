@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport">
+<meta name="theme-color" content="#131313">
+<title>Shop Setup | Obsidian Bloom</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,300;0,400;1,300;1,400&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0,0&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = { darkMode:"class", theme:{ extend:{ colors:{
+    primary:"#f2ca50","primary-container":"#d4af37","primary-fixed":"#ffe088","on-primary":"#3c2f00",
+    surface:"#131313","surface-low":"#1a1917","surface-lowest":"#0e0e0e","surface-high":"#2a2a2a","surface-highest":"#353534",
+    "on-surface":"#e5e2e1","on-surface-variant":"#d0c5af",outline:"#99907c","outline-variant":"#4d4635",secondary:"#c7c6c5",tertiary:"#ffbcd4"
+  }}}}
+</script>
+<style>
+  :root{color-scheme:dark}*{-webkit-tap-highlight-color:transparent}
+  body{background:#131313;color:#e5e2e1;font-family:'Manrope',sans-serif}
+  .serif{font-family:'Noto Serif',serif}
+  .material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 24}
+  ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:#4d4635;border-radius:10px}
+  .card{background:#1a1917;border:1px solid rgba(212,175,55,.12);border-radius:20px}
+  .bloom-spotlight::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at center,transparent 30%,#0e0e0e 100%);pointer-events:none}
+  .stat{font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:#99907c}
+  .badge{font-size:9px;text-transform:uppercase;letter-spacing:.1em;padding:3px 10px;border-radius:9999px;white-space:nowrap}
+  .badge.pending{background:#4d4635;color:#ffe088}.badge.approved{background:#1f5f37;color:#bfe6cd}.badge.rejected{background:#5f2320;color:#ffb4ab}
+  .fld{width:100%;background:#1c1b1b;border:1px solid #302d26;border-radius:12px;padding:.8rem .9rem;color:#e5e2e1;font-size:16px;transition:border-color .15s,box-shadow .15s}
+  .fld::placeholder{color:#6f685a}.fld:focus{outline:none;border-color:#f2ca50;box-shadow:0 0 0 3px rgba(242,202,80,.15)}
+  select.fld{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2399907c' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .8rem center}
+  .lbl{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:rgba(242,202,80,.7);margin-bottom:.5rem}
+  .navlink{display:flex;align-items:center;gap:.9rem;padding:.8rem 1.5rem;color:rgba(227,226,224,.55);font-size:12px;text-transform:uppercase;letter-spacing:.12em;transition:.15s;border-left:2px solid transparent}
+  .navlink:hover{color:#f2ca50;background:rgba(242,202,80,.05)}
+  .navlink.on{color:#f2ca50;background:#1c1b1b;border-left-color:#f2ca50}
+  .ob-toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:#f2ca50;color:#14110f;padding:12px 22px;border-radius:40px;font-weight:600;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:200;max-width:90vw;text-align:center}
+  .ob-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}.ob-toast.err{background:#ffb4ab}
+  @media(min-width:1024px){.sidebar{transform:none!important}}
+</style>
+</head>
+<body class="min-h-screen" style="min-height:100dvh">
+
+<header class="lg:hidden sticky top-0 z-40 bg-[#131313]/95 backdrop-blur border-b border-[#D4AF37]/15 h-16 flex items-center justify-between px-4">
+  <button id="menuBtn" class="w-10 h-10 flex items-center justify-center text-[#f2ca50] -ml-2"><span class="material-symbols-outlined">menu</span></button>
+  <span class="serif text-lg text-[#f2ca50]">Shop Setup</span>
+  <div class="w-9 h-9 rounded-full bg-surface-high border border-primary/20 flex items-center justify-center text-[#f2ca50]"><span class="material-symbols-outlined text-lg">person</span></div>
+</header>
+
+<div id="scrim" class="fixed inset-0 bg-black/60 z-40 hidden lg:hidden"></div>
+
+<div class="lg:flex">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar fixed lg:sticky top-0 left-0 z-50 h-screen w-72 shrink-0 bg-surface-lowest border-r border-[#D4AF37]/12 flex flex-col py-8 -translate-x-full transition-transform duration-300">
+    <div class="px-8 mb-10 flex items-start justify-between">
+      <div><h1 class="serif text-xl text-[#f2ca50]">Obsidian Bloom</h1><p class="stat mt-2">The Digital Curator</p></div>
+      <button id="closeBtn" class="lg:hidden text-on-surface-variant"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <nav class="flex-1 flex flex-col gap-1">
+      <a href="/dashboard" class="navlink"><span class="material-symbols-outlined">dashboard</span>Dashboard</a>
+      <a href="/shop" class="navlink on"><span class="material-symbols-outlined">storefront</span>Shop Setup</a>
+      <a href="#products" class="navlink"><span class="material-symbols-outlined">local_florist</span>Inventory</a>
+      <a href="/dashboard#insights" class="navlink"><span class="material-symbols-outlined">insights</span>Analytics</a>
+      <a href="#payout" class="navlink"><span class="material-symbols-outlined">payments</span>Payouts</a>
+    </nav>
+    <div class="px-6 mt-6">
+      <div class="flex items-center gap-3 px-1">
+        <div class="w-10 h-10 rounded-full bg-surface-high border border-primary/20 flex items-center justify-center text-[#f2ca50] shrink-0"><span class="material-symbols-outlined text-lg">person</span></div>
+        <div class="min-w-0"><p id="sideName" class="text-sm font-bold text-on-surface truncate">Vendor</p><p id="sideEmail" class="text-[10px] uppercase tracking-tight text-on-surface-variant truncate">—</p></div>
+      </div>
+      <button id="logoutBtn" class="mt-5 text-[10px] uppercase tracking-widest text-on-surface-variant hover:text-tertiary transition">Sign out</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 min-w-0 px-4 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-6xl mx-auto w-full">
+    <div class="mb-8 lg:mb-10">
+      <span class="stat block mb-2">Shop Setup</span>
+      <h1 class="serif text-3xl sm:text-4xl font-light text-primary tracking-tight">Curate Your <span class="italic">Collection</span></h1>
+      <p class="text-on-surface-variant font-light max-w-xl text-sm sm:text-base mt-2">Upload your masterpiece. Submitted pieces appear as drafts and go live once Obsidian Bloom approves them.</p>
+    </div>
+
+    <form id="publishForm" class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
+      <div class="card p-5 sm:p-6 space-y-7 order-2 lg:order-1">
+        <div>
+          <span class="lbl">I · Visual Identity</span>
+          <div class="relative w-full aspect-[4/5] max-h-[420px] rounded-2xl bg-surface-low border border-dashed border-outline-variant hover:border-primary/40 transition-colors flex flex-col items-center justify-center text-center p-6 overflow-hidden">
+            <img id="uploadThumb" class="absolute inset-0 w-full h-full object-cover hidden" alt="">
+            <span class="material-symbols-outlined text-5xl text-outline mb-3">add_a_photo</span>
+            <p class="text-sm font-light text-on-surface-variant">Tap to upload, or drag a bouquet photo here</p>
+            <input id="imageInput" name="image" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer" type="file">
+          </div>
+        </div>
+        <div><span class="lbl">II · Name</span>
+          <input id="nameInput" required class="fld serif text-lg" placeholder="Bouquet name" type="text"></div>
+        <div><span class="lbl">III · Narrative</span>
+          <textarea id="narrativeInput" rows="3" class="fld resize-none font-light text-sm" placeholder="Describe the emotional arc…"></textarea></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div><span class="lbl">IV · Price</span>
+            <div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-primary serif">$</span>
+              <input id="priceInput" min="0" step="0.01" class="fld serif text-lg pl-7" placeholder="0.00" type="number"></div></div>
+          <div><span class="lbl">V · Stem Density</span>
+            <select id="stemInput" class="fld text-sm cursor-pointer">
+              <option class="bg-surface">Petite (8-12 stems)</option><option class="bg-surface">Standard (15-20 stems)</option>
+              <option class="bg-surface">Grand (25-35 stems)</option><option class="bg-surface">Masterpiece (50+ stems)</option></select></div>
+        </div>
+        <button id="publishBtn" type="submit" class="w-full min-h-[54px] rounded-full bg-gradient-to-r from-primary to-primary-container text-on-primary serif text-lg tracking-wide hover:brightness-105 transition-all active:scale-[0.98]">Publish to Gallery</button>
+      </div>
+
+      <div class="order-1 lg:order-2">
+        <span class="lbl">Live Gallery Preview</span>
+        <div class="lg:sticky lg:top-6 relative overflow-hidden rounded-2xl bg-surface-lowest border border-outline-variant/10 shadow-2xl">
+          <div class="relative aspect-[4/5] max-h-[460px] overflow-hidden bloom-spotlight bg-surface-high">
+            <img id="previewImg" class="w-full h-full object-cover" alt="Preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='500'%3E%3Crect width='100%25' height='100%25' fill='%231c1b1b'/%3E%3C/svg%3E">
+          </div>
+          <div class="p-5 sm:p-7 space-y-3">
+            <div class="flex justify-between items-start gap-3">
+              <div class="min-w-0">
+                <h3 id="previewName" class="serif text-2xl sm:text-3xl font-light text-primary-fixed leading-tight break-words">Nocturnal Muse</h3>
+                <p id="previewStem" class="text-[10px] uppercase tracking-widest text-tertiary mt-1">Standard Collection</p>
+              </div>
+              <span id="previewPrice" class="text-xl sm:text-2xl serif text-on-surface-variant whitespace-nowrap">$185</span>
+            </div>
+            <p id="previewNarrative" class="text-sm font-light text-secondary opacity-70 leading-relaxed italic">"A whisper of midnight captured in velvet petals."</p>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <section id="products" class="mt-12 scroll-mt-20">
+      <h2 class="serif text-2xl font-light text-primary-fixed mb-5">My Collection</h2>
+      <div class="card p-5 sm:p-6"><div id="productList" class="text-sm"><p class="text-on-surface-variant/60">Loading…</p></div></div>
+    </section>
+
+    <section class="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="card p-5 sm:p-6">
+        <h2 class="serif text-xl font-light text-primary-fixed mb-5 tracking-tight">Merchant Identity</h2>
+        <form id="merchantForm" class="space-y-4">
+          <div><span class="lbl">Business Name</span><input id="bizName" class="fld text-sm" type="text" placeholder="Your business name"></div>
+          <div><span class="lbl">VAT / Dealer number</span><input id="vat" class="fld text-sm" type="text" placeholder="Optional"></div>
+          <button type="submit" class="w-full min-h-[48px] rounded-full border border-primary/40 text-primary text-sm hover:bg-primary/10 transition">Save Identity</button>
+        </form>
+      </div>
+
+      <div id="payout" class="card p-5 sm:p-6 scroll-mt-20">
+        <div class="flex items-center gap-2 mb-5"><span class="material-symbols-outlined text-tertiary">account_balance</span>
+          <h2 class="text-[11px] uppercase tracking-widest text-on-surface-variant font-bold">Payouts</h2></div>
+        <div class="space-y-4">
+          <p id="stripeStatus" class="text-sm font-light text-on-surface-variant leading-relaxed">Checking payout status…</p>
+          <button id="stripeBtn" class="block w-full text-center min-h-[48px] rounded-full bg-[#635bff] text-white text-sm font-medium hover:opacity-90 transition">Connect Stripe</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="ob-toast"></div>
+<script>
+  var $=function(i){return document.getElementById(i)},toastEl=$('toast'),tT;
+  function toast(m,e){toastEl.textContent=m;toastEl.className='ob-toast show'+(e?' err':'');clearTimeout(tT);tT=setTimeout(function(){toastEl.className='ob-toast'},3200)}
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+  function money(v){var n=Number(v);return '$'+(isNaN(n)?'0':n.toFixed(n%1?2:0))}
+
+  function openNav(){$('sidebar').classList.remove('-translate-x-full');$('scrim').classList.remove('hidden')}
+  function closeNav(){$('sidebar').classList.add('-translate-x-full');$('scrim').classList.add('hidden')}
+  $('menuBtn').addEventListener('click',openNav);$('closeBtn').addEventListener('click',closeNav);$('scrim').addEventListener('click',closeNav);
+  $('logoutBtn').addEventListener('click',async function(){await fetch('/auth/logout',{method:'POST'});location.href='/login'});
+
+  $('nameInput').addEventListener('input',function(e){$('previewName').textContent=e.target.value||'Nocturnal Muse'});
+  $('narrativeInput').addEventListener('input',function(e){$('previewNarrative').textContent=e.target.value?'"'+e.target.value+'"':'"A whisper of midnight captured in velvet petals."'});
+  $('priceInput').addEventListener('input',function(e){$('previewPrice').textContent=e.target.value?money(e.target.value):'$0'});
+  $('stemInput').addEventListener('change',function(e){$('previewStem').textContent=(e.target.value.split(' (')[0]||'Standard')+' Collection'});
+  $('imageInput').addEventListener('change',function(e){var f=e.target.files&&e.target.files[0];if(!f)return;var u=URL.createObjectURL(f);$('previewImg').src=u;$('uploadThumb').src=u;$('uploadThumb').classList.remove('hidden')});
+
+  async function loadMe(){
+    var j=await (await fetch('/api/me')).json();
+    if(!j.session||j.session.role!=='vendor'){location.href='/login';return}
+    $('sideName').textContent=j.session.business_name||'Vendor';$('sideEmail').textContent=j.session.email||'';
+    $('bizName').value=j.session.business_name||'';$('vat').value=j.session.vat||'';
+    if(j.stripeEnabled===false){$('stripeStatus').textContent='Payouts are not configured by the marketplace yet.';$('stripeBtn').style.display='none'}
+    else loadStripe();
+  }
+  async function loadProducts(){
+    var j=await (await fetch('/api/my-products')).json();var el=$('productList');
+    if(!j.products.length){el.innerHTML='<p class="text-on-surface-variant/60">No submissions yet.</p>';return}
+    el.innerHTML=j.products.map(function(p){return '<div class="flex items-center justify-between gap-3 border-b border-outline-variant/10 last:border-0 py-3"><span class="min-w-0 truncate">'+esc(p.title)+' · <span class="text-outline">$'+esc(p.price)+'</span></span><span class="badge '+p.status+'">'+esc(p.status)+'</span></div>'}).join('');
+  }
+  async function loadStripe(){
+    try{var s=await (await fetch('/api/stripe/status')).json();
+      if(s.connected&&s.payouts_enabled){$('stripeStatus').textContent='Stripe connected — payouts enabled.';$('stripeBtn').textContent='Manage on Stripe'}
+      else if(s.connected){$('stripeStatus').textContent='Stripe connected — finish onboarding to enable payouts.';$('stripeBtn').textContent='Finish Stripe setup'}
+      else{$('stripeStatus').textContent='Connect your account to receive disbursements securely. No bank details are stored here.'}
+    }catch(e){}
+  }
+  $('stripeBtn').addEventListener('click',async function(){
+    try{var j=await (await fetch('/api/stripe/connect',{method:'POST'})).json();if(!j.ok)throw new Error(j.error);location.href=j.url}
+    catch(e){toast(e.message,true)}
+  });
+
+  $('publishForm').addEventListener('submit',async function(e){
+    e.preventDefault();var b=$('publishBtn');
+    if(!$('nameInput').value.trim()){toast('Bouquet name is required.',true);return}
+    var fd=new FormData();fd.append('name',$('nameInput').value);fd.append('narrative',$('narrativeInput').value);
+    fd.append('price',$('priceInput').value);fd.append('stem_density',$('stemInput').value);
+    if($('imageInput').files[0])fd.append('image',$('imageInput').files[0]);
+    b.disabled=true;b.textContent='Publishing…';
+    try{var j=await (await fetch('/api/publish',{method:'POST',body:fd})).json();if(!j.ok)throw new Error(j.error);
+      toast('Submitted for review ✓');$('publishForm').reset();$('uploadThumb').classList.add('hidden');
+      $('previewName').textContent='Nocturnal Muse';$('previewPrice').textContent='$185';loadProducts();}
+    catch(err){toast(err.message,true)}finally{b.disabled=false;b.textContent='Publish to Gallery'}
+  });
+  $('merchantForm').addEventListener('submit',async function(e){
+    e.preventDefault();
+    try{var j=await (await fetch('/api/merchant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({business_name:$('bizName').value,vat:$('vat').value})})).json();
+      if(!j.ok)throw new Error(j.error);toast('Identity saved ✓');$('sideName').textContent=$('bizName').value||'Vendor'}
+    catch(err){toast(err.message,true)}
+  });
+  loadMe();loadProducts();
+</script>
+</body></html>

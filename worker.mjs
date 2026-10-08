@@ -18,6 +18,7 @@ import { makeStripe } from './stripe.mjs';
 import loginHtml from './public/login.html';
 import signupHtml from './public/signup.html';
 import dashboardHtml from './public/dashboard.html';
+import shopHtml from './public/shop.html';
 import adminHtml from './public/admin.html';
 
 const app = new Hono();
@@ -116,6 +117,44 @@ app.get('/api/my-products', requireVendor(), async (c) => {
     const db = makeDb(c.env);
     const rows = await db.all('SELECT id, title, price, status, created_at FROM products WHERE vendor_id = ? ORDER BY id DESC', [c.get('vendorId')]);
     return c.json({ ok: true, products: rows });
+  } catch (e) { console.error(e); return c.json({ ok: false, error: String(e.message || e) }, 500); }
+});
+
+/* --------------------------- Vendor: earnings / insights --------------------------- */
+app.get('/api/my-earnings', requireVendor(), async (c) => {
+  try {
+    const db = makeDb(c.env);
+    const vid = c.get('vendorId');
+    const sum = await db.get(`
+      SELECT
+        COALESCE(SUM(net_cents),0)                                                              total,
+        COALESCE(SUM(CASE WHEN paid_out = 0 THEN net_cents ELSE 0 END),0)                        owed,
+        COALESCE(SUM(CASE WHEN created_at >= datetime('now','-7 days')   THEN net_cents END),0)  week,
+        COALESCE(SUM(CASE WHEN created_at >= datetime('now','-30 days')  THEN net_cents END),0)  month,
+        COALESCE(SUM(CASE WHEN created_at >= datetime('now','-182 days') THEN net_cents END),0)  sixmo,
+        COALESCE(SUM(CASE WHEN created_at >= datetime('now','start of year') THEN net_cents END),0) ytd,
+        COUNT(*) orders, MAX(currency) currency
+      FROM earnings WHERE vendor_id = ?`, [vid]);
+    const recent = await db.all(
+      `SELECT order_id, gross_cents, net_cents, currency, paid_out, created_at
+       FROM earnings WHERE vendor_id = ? ORDER BY id DESC LIMIT 6`, [vid]);
+    const counts = await db.get(
+      `SELECT COUNT(*) listed,
+              COALESCE(SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END),0) approved,
+              COALESCE(SUM(CASE WHEN status='pending'  THEN 1 ELSE 0 END),0) pending
+       FROM products WHERE vendor_id = ?`, [vid]);
+    const currency = (sum && sum.currency) || 'usd';
+    return c.json({
+      ok: true,
+      commission: commissionPct(c.env),
+      currency,
+      summary: {
+        total: sum.total, owed: sum.owed, week: sum.week, month: sum.month,
+        sixmo: sum.sixmo, ytd: sum.ytd, orders: sum.orders,
+      },
+      counts,
+      recent,
+    });
   } catch (e) { console.error(e); return c.json({ ok: false, error: String(e.message || e) }, 500); }
 });
 
@@ -272,6 +311,11 @@ app.get('/dashboard', async (c) => {
   const s = await readSession(c);
   if (s?.role !== 'vendor') return c.redirect('/login');
   return html(dashboardHtml);
+});
+app.get('/shop', async (c) => {
+  const s = await readSession(c);
+  if (s?.role !== 'vendor') return c.redirect('/login');
+  return html(shopHtml);
 });
 app.get('/admin', async (c) => {
   const s = await readSession(c);
