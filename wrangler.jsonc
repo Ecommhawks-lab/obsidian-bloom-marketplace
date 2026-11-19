@@ -18,6 +18,7 @@
   //   optional: STRIPE_SECRET, RESEND_API_KEY
   "vars": {
     "SHOP": "flowersmarketplace.myshopify.com",
+    "APP_URL": "https://obsidian-bloom-marketplace.mercado-bloom.workers.dev",
     "API_VERSION": "2026-10",
     "PROXY_PREFIX": "/apps/mb",
     "PRODUCT_TYPE": "Bouquet",

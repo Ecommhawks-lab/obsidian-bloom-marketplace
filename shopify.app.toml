@@ -1,29 +1,29 @@
-# Mercado Bloom marketplace app. Fill client_id, then: shopify app deploy
-# (application_url = your Cloudflare Worker URL)
-client_id = "PASTE_CLIENT_ID_FROM_DEV_DASHBOARD"
+# Mercado Bloom marketplace app (Ecomm Hawks Dev Dashboard). Configured in the Dev Dashboard;
+# `shopify app deploy` from this file also works.
+client_id = "e7ae0461a5d1545cd8b1d88d0d5a9c2e"
 name = "Mercado Bloom Marketplace"
-application_url = "https://obsidian-bloom-marketplace.mohammadusama006.workers.dev"
+application_url = "https://obsidian-bloom-marketplace.mercado-bloom.workers.dev"
 embedded = true
 
 [access_scopes]
 scopes = "read_products,write_products,read_customers,write_customers,read_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,read_metaobjects,write_metaobjects,read_metaobject_definitions,write_files,read_files,read_publications,write_publications,write_app_proxy"
 
 [auth]
-redirect_urls = ["https://obsidian-bloom-marketplace.mohammadusama006.workers.dev/auth/callback"]
+redirect_urls = ["https://obsidian-bloom-marketplace.mercado-bloom.workers.dev/auth/callback"]
 
 [webhooks]
 api_version = "2026-10"
 
   [[webhooks.subscriptions]]
   topics = ["orders/create", "app/uninstalled"]
-  uri = "https://obsidian-bloom-marketplace.mohammadusama006.workers.dev/webhooks"
+  uri = "https://obsidian-bloom-marketplace.mercado-bloom.workers.dev/webhooks"
 
   [[webhooks.subscriptions]]
   compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
-  uri = "https://obsidian-bloom-marketplace.mohammadusama006.workers.dev/webhooks"
+  uri = "https://obsidian-bloom-marketplace.mercado-bloom.workers.dev/webhooks"
 
 [app_proxy]
-url = "https://obsidian-bloom-marketplace.mohammadusama006.workers.dev/proxy"
+url = "https://obsidian-bloom-marketplace.mercado-bloom.workers.dev/proxy"
 subpath = "mb"
 prefix = "apps"
 

@@ -9,7 +9,7 @@ What you need: the Shopify Partner account, Cloudflare (where the worker already
 1. In `Ecommhawks-lab/obsidian-bloom-marketplace`, delete the old files at the root: `worker.mjs`, `auth.mjs`, `db.mjs`, `shopify.mjs`, `stripe.mjs` and the `public/` folder.
 2. Copy everything from this folder in (`src/`, `scripts/`, `test/`, `package.json`, `wrangler.jsonc`, `shopify.app.toml`, `README.md`, `SETUP.md`). Commit and push.
 3. If the worker is connected to Git, Cloudflare redeploys by itself. If not, run `npm install` then `npm run deploy`.
-4. Check that `https://obsidian-bloom-marketplace.mohammadusama006.workers.dev/health` returns `{"ok":true}`.
+4. Check that `https://obsidian-bloom-marketplace.mercado-bloom.workers.dev/health` returns `{"ok":true}`.
 
 ## 2. Create the app in your Partner account
 
