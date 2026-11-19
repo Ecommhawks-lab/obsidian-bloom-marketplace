@@ -1,0 +1,35 @@
+# Mercado Bloom marketplace app. Fill client_id, then: shopify app deploy
+# (application_url = your Cloudflare Worker URL)
+client_id = "PASTE_CLIENT_ID_FROM_DEV_DASHBOARD"
+name = "Mercado Bloom Marketplace"
+application_url = "https://obsidian-bloom-marketplace.mohammadusama006.workers.dev"
+embedded = true
+
+[access_scopes]
+scopes = "read_products,write_products,read_customers,write_customers,read_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,read_metaobjects,write_metaobjects,read_metaobject_definitions,write_files,read_files,read_publications,write_publications,write_app_proxy"
+
+[auth]
+redirect_urls = ["https://obsidian-bloom-marketplace.mohammadusama006.workers.dev/auth/callback"]
+
+[webhooks]
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  topics = ["orders/create", "app/uninstalled"]
+  uri = "https://obsidian-bloom-marketplace.mohammadusama006.workers.dev/webhooks"
+
+  [[webhooks.subscriptions]]
+  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+  uri = "https://obsidian-bloom-marketplace.mohammadusama006.workers.dev/webhooks"
+
+[app_proxy]
+url = "https://obsidian-bloom-marketplace.mohammadusama006.workers.dev/proxy"
+subpath = "mb"
+prefix = "apps"
+
+[pos]
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = false
+include_config_on_deploy = true
