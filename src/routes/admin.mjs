@@ -249,7 +249,7 @@ api.post('/settings', async (c) => {
     if (b[k] === undefined) continue;
     let v = String(b[k]).trim();
     if (['commission_pct', 'uplift_ils', 'courier_fee_ils', 'review_days'].includes(k)) v = String(Math.max(0, Number(v) || 0));
-    if (['auto_assign_couriers', 'enforce_capacity'].includes(k)) v = v === '1' || v === 'true' ? '1' : '0';
+    if (['auto_assign_couriers', 'enforce_capacity', 'weekend_queue'].includes(k)) v = v === '1' || v === 'true' ? '1' : '0';
     await db.setSetting(k, v);
   }
   return c.json({ ok: true });
