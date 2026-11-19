@@ -348,7 +348,8 @@ export function makeAdmin(env, shop) {
         `mutation($handle: MetaobjectHandleInput!, $metaobject: MetaobjectUpsertInput!) {
            metaobjectUpsert(handle: $handle, metaobject: $metaobject) { metaobject { id } userErrors { field message } }
          }`,
-        { handle: { type: 'mb_creator', handle: creator.handle }, metaobject: { fields } }
+        // Metaobject handles must be ASCII (a-z, 0-9, -, _). Hebrew business names fall back to creator-<id>.
+        { handle: { type: 'mb_creator', handle: /^[a-z0-9][a-z0-9_-]*$/.test(creator.handle || '') ? creator.handle : `creator-${creator.id}` }, metaobject: { fields } }
       );
       const e = userErr(d.metaobjectUpsert, 'userErrors'); if (e) throw new Error('metaobjectUpsert: ' + e);
       return d.metaobjectUpsert.metaobject.id;
