@@ -8,7 +8,7 @@
  */
 import { Hono } from 'hono';
 import { ensureSchema, makeDb } from './db.mjs';
-import { verifyWebhook, getAccessToken } from './shopify.mjs';
+import { verifyWebhook, getAccessToken, makeAdmin } from './shopify.mjs';
 import { processOrder, dailyReset } from './logic.mjs';
 import adminApi from './routes/admin.mjs';
 import proxy from './routes/proxy.mjs';
@@ -81,6 +81,7 @@ export default {
     ctx.waitUntil((async () => {
       try { await ensureSchema(env); } catch (e) { console.error(e); return; }
       try { await getAccessToken(env); } catch (e) { console.error('token', e.message); return; }
+      if (env.APP_URL) { try { await makeAdmin(env).registerWebhooks(env.APP_URL); } catch (e) { console.error('webhooks', e.message); } }
       try { await dailyReset(env); } catch (e) { console.error('reset', e); }
     })());
   },
