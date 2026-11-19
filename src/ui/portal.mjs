@@ -240,6 +240,7 @@ function deliveryCard(ctx, d, actions = true) {
     `<button class="mbp-btn ${cls}" data-action="courier/deliveries/${d.id}" data-body='{"status":"${status}"}'${confirm ? ` data-confirm="${esc(confirm)}"` : ''}>${label}</button>`;
   return `<article class="mbp-delivery">
     <div class="mbp-delivery__head"><b>${esc(d.order_name)} · ${esc(d.city)}</b>${badge(DELIVERY_STATUS, d.status)}</div>
+    ${d.deliver_on ? `<div><b>לביצוע ב-<span class="mbp-num">${esc(d.deliver_on.split('-').reverse().join('/'))}</span></b></div>` : ''}
     <div>${esc(d.customer_name)}${d.phone ? ` · <a href="tel:${esc(d.phone)}" class="mbp-num">${esc(d.phone)}</a>` : ''}</div>
     <div class="mbp-muted">${esc(addr)}</div>
     ${d.note ? `<div class="mbp-muted">הערה: ${esc(d.note)}</div>` : ''}
