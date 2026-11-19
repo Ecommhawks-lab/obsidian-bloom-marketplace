@@ -69,6 +69,11 @@ dialog .db{padding:16px;max-height:70vh;overflow:auto}dialog .df{padding:12px 16
 const SHOP = '%%SHOP%%';
 const STORE_ADMIN = 'https://admin.shopify.com/store/' + SHOP.replace('.myshopify.com', '');
 let LANG = (() => { try { return localStorage.getItem('mb_lang') || 'he'; } catch { return 'he'; } })();
+// Labels for application form fields (keys sent by the theme join forms).
+const FL = {
+  he: { categories:'תחום יצירה', business:'שם העסק', business_type:'סוג העסק', business_number:'מספר עוסק / ח.פ.', instagram:'אינסטגרם / תיק עבודות', about:'על היצירה', areas:'אזורי חלוקה', vehicle:'כלי רכב', license:'רישיון נהיגה', days:'ימים זמינים', from:'משעה', to:'עד שעה' },
+  en: { categories:'Craft', business:'Business name', business_type:'Business type', business_number:'Business number', instagram:'Instagram / portfolio', about:'About', areas:'Delivery areas', vehicle:'Vehicle', license:'Driving licence', days:'Available days', from:'From', to:'To' },
+};
 const T = {
   he: { overview:'סקירה', nav_apps:'בקשות הצטרפות', nav_products:'אישור מוצרים', nav_creators:'יוצרים', nav_orders:'הזמנות', nav_couriers:'שליחים ומשלוחים', nav_payouts:'תשלומים', nav_settings:'הגדרות',
     k_apps:'בקשות ממתינות', k_products:'מוצרים לאישור', k_orders:'הזמנות ב-24 שעות', k_active:'משלוחים בדרך', k_unassigned:'משלוחים ללא שליח', k_owedC:'חוב ליוצרים', k_owedK:'חוב לשליחים', k_creators:'יוצרים פעילים', k_couriers:'שליחים פעילים', k_sales:'מכירות יוצרים (30 יום)', k_comm:'עמלה (30 יום)',
@@ -179,7 +184,7 @@ const pages = {
         return `<div class="card app"><div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(a.name)}</h2>${st(a.status)}</div>
           <p class="muted">${day(a.created_at)}</p>
           <dl>${field(t('email'), a.email)}${field(t('phone'), a.phone)}${field(t('city'), a.city)}
-            ${Object.entries(x).filter(([k]) => !['name', 'email', 'phone', 'city', 'kind'].includes(k)).map(([k, v]) => field(k, v)).join('')}
+            ${Object.entries(x).filter(([k]) => !['name', 'email', 'phone', 'city', 'kind', 'terms', 'images'].includes(k)).map(([k, v]) => field((FL[LANG] && FL[LANG][k]) || k, v)).join('')}
             ${a.note ? field('note', a.note) : ''}</dl>
           ${a.images.length ? `<div class="thumbs">${a.images.map((u) => `<a href="${esc(u)}" target="_blank"><img src="${esc(u)}" alt=""></a>`).join('')}</div>` : ''}
           ${a.status === 'pending' ? `<div class="row"><button class="btn primary" data-ok="${a.id}">${t('approve')}</button><button class="btn danger" data-no="${a.id}">${t('reject')}</button></div>` : ''}</div>`;
