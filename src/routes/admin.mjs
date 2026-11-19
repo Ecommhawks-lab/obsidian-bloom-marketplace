@@ -20,8 +20,15 @@ api.use('*', async (c, next) => {
   let s;
   try { s = await verifySessionToken(c.env, token); } catch (e) { return fail(c, 'Invalid session: ' + e.message, 401); }
   try {
-    // Webhooks and the app proxy are declared in shopify.app.toml (shopify app deploy).
-    await ensureOfflineToken(c.env, s.shop, token);
+    const fresh = await ensureOfflineToken(c.env, s.shop, token);
+    if (fresh) {
+      // First open after install (or re-auth): subscribe orders/create + app/uninstalled.
+      // Safe to repeat: existing subscriptions to this URL are skipped.
+      const job = makeAdmin(c.env, s.shop).registerWebhooks(new URL(c.req.url).origin)
+        .catch((e) => console.error('webhooks', e.message));
+      let ctx = null; try { ctx = c.executionCtx; } catch { /* tests */ }
+      if (ctx?.waitUntil) ctx.waitUntil(job); else await job;
+    }
   } catch (e) { return fail(c, 'Could not authorise with Shopify: ' + e.message, 401); }
   c.set('shop', s.shop);
   await next();
