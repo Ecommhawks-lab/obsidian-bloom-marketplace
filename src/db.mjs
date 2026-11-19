@@ -50,7 +50,7 @@ export function makeDb(env) {
 }
 
 export const DEFAULT_SETTINGS = {
-  commission_pct: '15',        // platform commission on the creator's price
+  commission_pct: '23',        // platform commission on the creator's price (business plan: 23%)
   uplift_ils: '25',            // added on top of the creator's price (covers free delivery)
   courier_fee_ils: '25',       // paid to the courier per delivered order
   auto_assign_couriers: '1',   // assign new orders to a courier who covers the city
@@ -58,6 +58,7 @@ export const DEFAULT_SETTINGS = {
   payout_currency: 'ils',
   notify_email: '',            // where new applications are announced (needs RESEND_API_KEY)
   review_days: '5',
+  weekend_queue: '1',          // Fri/Sat orders are delivered on Sunday (Israeli work week)
 };
 
 let initialized = false;
@@ -153,6 +154,8 @@ export async function ensureSchema(env) {
       PRIMARY KEY (creator_id, day)
     );
   `);
+  // Added after first release: planned delivery day (Fri/Sat orders move to Sunday).
+  try { await client.execute('ALTER TABLE mb_deliveries ADD COLUMN deliver_on TEXT'); } catch { /* already there */ }
   await migrateLegacy(makeDb(env));
   initialized = true;
 }
@@ -207,6 +210,17 @@ export function slugify(s) {
 }
 
 // Israel calendar day (YYYY-MM-DD), used for daily capacity.
+// Planned delivery day in Israel: orders placed on Friday or Saturday wait for Sunday.
+export function deliveryDay(d = new Date(), weekendQueue = true) {
+  const day = israelDay(d);
+  if (!weekendQueue) return day;
+  const wd = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jerusalem', weekday: 'short' }).format(d);
+  const add = wd === 'Fri' ? 2 : wd === 'Sat' ? 1 : 0;
+  if (!add) return day;
+  const [y, m, dd] = day.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, dd + add)).toISOString().slice(0, 10);
+}
+
 export function israelDay(d = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 }

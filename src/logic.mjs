@@ -1,5 +1,5 @@
 // Business rules shared by the admin dashboard, the portals, webhooks and cron.
-import { makeDb, slugify, israelDay } from './db.mjs';
+import { makeDb, slugify, israelDay, deliveryDay } from './db.mjs';
 import { makeAdmin } from './shopify.mjs';
 import { makeStripe } from './stripe.mjs';
 
@@ -198,9 +198,10 @@ export async function processOrder(env, order) {
   if (Object.keys(perCreator).length && order.shipping_address) {
     const fee = Math.round((Number(s.courier_fee_ils) || 0) * 100);
     const r = await db.run(
-      `INSERT OR IGNORE INTO mb_deliveries (order_id, order_name, city, address, customer_name, phone, note, fee_cents)
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [orderId, order.name || '', city, JSON.stringify(ship), customerName, ship.phone || order.phone || '', order.note || '', fee]
+      `INSERT OR IGNORE INTO mb_deliveries (order_id, order_name, city, address, customer_name, phone, note, fee_cents, deliver_on)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [orderId, order.name || '', city, JSON.stringify(ship), customerName, ship.phone || order.phone || '', order.note || '', fee,
+       deliveryDay(order.created_at ? new Date(order.created_at) : new Date(), s.weekend_queue !== '0')]
     );
     if (r.changes && s.auto_assign_couriers === '1') await autoAssign(env, orderId);
   }
