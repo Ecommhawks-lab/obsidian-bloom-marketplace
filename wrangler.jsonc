@@ -22,5 +22,16 @@
     "PROXY_PREFIX": "/apps/mb",
     "PRODUCT_TYPE": "Bouquet",
     "NOTIFY_FROM": ""
+  },
+
+  // Preview builds (non-main branches). Same public values; previews have no cron.
+  "previews": {
+    "vars": {
+      "SHOP": "flowersmarketplace.myshopify.com",
+      "API_VERSION": "2026-10",
+      "PROXY_PREFIX": "/apps/mb",
+      "PRODUCT_TYPE": "Bouquet",
+      "NOTIFY_FROM": ""
+    }
   }
 }
