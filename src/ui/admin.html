@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="shopify-api-key" content="%%API_KEY%%">
+<title>Mercado Bloom</title>
+<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+<style>
+:root{--bg:#F1F1F1;--card:#fff;--line:#E3E3E3;--ink:#303030;--muted:#616161;--soft:#F7F7F7;--ok:#0C5132;--okbg:#CDFEE1;--warn:#5E4200;--warnbg:#FFEB78;--bad:#8E1F0B;--badbg:#FEDAD9;--info:#00527C;--infobg:#EAF4FF}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"San Francisco","Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.head h1{font-size:20px;margin:0;font-weight:650}
+.card{background:var(--card);border-radius:12px;box-shadow:0 1px 0 rgba(0,0,0,.07),0 0 0 1px rgba(0,0,0,.05);padding:16px;margin-bottom:14px}
+.card h2{font-size:14px;font-weight:650;margin:0 0 12px}
+.grid{display:grid;gap:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 1px 0 rgba(0,0,0,.07),0 0 0 1px rgba(0,0,0,.05);cursor:default}
+.kpi[data-go]{cursor:pointer}.kpi[data-go]:hover{box-shadow:0 0 0 2px #303030}
+.kpi small{color:var(--muted);display:block}.kpi b{font-size:22px;font-weight:650;display:block;margin-top:4px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:start;padding:10px 8px;border-top:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:12.5px;border-top:0;background:var(--soft)}
+tr.click{cursor:pointer}tr.click:hover td{background:#FAFAFA}
+.num{direction:ltr;unicode-bidi:isolate;white-space:nowrap}
+.badge{display:inline-block;border-radius:8px;padding:1px 8px;font-size:12px;font-weight:550;background:#E3E3E3;white-space:nowrap}
+.b-ok{background:var(--okbg);color:var(--ok)}.b-warn{background:var(--warnbg);color:var(--warn)}.b-bad{background:var(--badbg);color:var(--bad)}.b-info{background:var(--infobg);color:var(--info)}
+.btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:8px;padding:7px 12px;font:inherit;font-weight:600;cursor:pointer;background:#fff;color:var(--ink);box-shadow:inset 0 0 0 1px #C9C9C9;min-height:32px;text-decoration:none}
+.btn:hover{background:#F7F7F7}.btn.primary{background:#303030;color:#fff;box-shadow:none}.btn.primary:hover{background:#1a1a1a}
+.btn.danger{color:var(--bad);box-shadow:inset 0 0 0 1px #E4A9A3}.btn[disabled]{opacity:.5;cursor:wait}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{border:0;background:transparent;padding:6px 12px;border-radius:8px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
+.tabs button[aria-pressed=true]{background:#fff;color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.field{margin-bottom:12px}.field label{display:block;font-weight:600;margin-bottom:4px}
+input[type=text],input[type=number],input[type=email],select,textarea{width:100%;border:1px solid #8A8A8A;border-radius:8px;padding:7px 10px;font:inherit;background:#fff;min-height:34px}
+.help{color:var(--muted);font-size:12.5px;margin-top:4px}
+.two{display:grid;gap:14px}@media(min-width:900px){.two{grid-template-columns:2fr 1fr;align-items:start}}
+.apps{display:grid;gap:12px}@media(min-width:900px){.apps{grid-template-columns:1fr 1fr}}
+.app dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0 0 10px}.app dt{color:var(--muted)}.app dd{margin:0;word-break:break-word}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}.thumbs img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.prod{display:grid;grid-template-columns:96px 1fr;gap:14px}.prod img{width:96px;height:96px;object-fit:cover;border-radius:10px;background:var(--soft);border:1px solid var(--line)}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+.banner{border-radius:12px;padding:12px 14px;margin-bottom:14px;background:var(--infobg);color:#00324D}
+.banner.warn{background:var(--warnbg);color:#4F3600}.banner.bad{background:var(--badbg);color:#5E1609}
+.muted{color:var(--muted)}.spin{opacity:.6}
+dialog{border:0;border-radius:14px;padding:0;max-width:640px;width:calc(100% - 24px);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog .dh{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+dialog .db{padding:16px;max-height:70vh;overflow:auto}dialog .df{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+.lang{font-size:12px}
+</style>
+</head>
+<body>
+<ui-nav-menu>
+  <a href="/" rel="home">Mercado Bloom</a>
+  <a href="/applications" data-t="nav_apps">בקשות הצטרפות</a>
+  <a href="/products" data-t="nav_products">אישור מוצרים</a>
+  <a href="/creators" data-t="nav_creators">יוצרים</a>
+  <a href="/orders" data-t="nav_orders">הזמנות</a>
+  <a href="/couriers" data-t="nav_couriers">שליחים ומשלוחים</a>
+  <a href="/payouts" data-t="nav_payouts">תשלומים</a>
+  <a href="/settings" data-t="nav_settings">הגדרות</a>
+</ui-nav-menu>
+<main id="app"><div class="empty">…</div></main>
+<dialog id="dlg"><div class="dh"><b id="dlg-t"></b><button class="btn" data-close>✕</button></div><div class="db" id="dlg-b"></div><div class="df" id="dlg-f"></div></dialog>
+<script>
+const SHOP = '%%SHOP%%';
+const STORE_ADMIN = 'https://admin.shopify.com/store/' + SHOP.replace('.myshopify.com', '');
+let LANG = (() => { try { return localStorage.getItem('mb_lang') || 'he'; } catch { return 'he'; } })();
+const T = {
+  he: { overview:'סקירה', nav_apps:'בקשות הצטרפות', nav_products:'אישור מוצרים', nav_creators:'יוצרים', nav_orders:'הזמנות', nav_couriers:'שליחים ומשלוחים', nav_payouts:'תשלומים', nav_settings:'הגדרות',
+    k_apps:'בקשות ממתינות', k_products:'מוצרים לאישור', k_orders:'הזמנות ב-24 שעות', k_active:'משלוחים בדרך', k_unassigned:'משלוחים ללא שליח', k_owedC:'חוב ליוצרים', k_owedK:'חוב לשליחים', k_creators:'יוצרים פעילים', k_couriers:'שליחים פעילים', k_sales:'מכירות יוצרים (30 יום)', k_comm:'עמלה (30 יום)',
+    recent:'הזמנות אחרונות', none:'אין כרגע', approve:'אישור', reject:'דחייה', hide:'הסתרה', save:'שמירה', cancel:'ביטול', creator:'יוצר/ת', courier:'שליח/ה', creators:'יוצרים', couriers:'שליחים', pending:'ממתינות', approved:'אושרו', rejected:'נדחו', all:'הכל',
+    reason:'סיבה (תוצג ליוצר/ת)', note:'הערה (תישלח במייל, רשות)', name:'שם', city:'עיר', email:'אימייל', phone:'טלפון', live:'פעילים', owed:'לתשלום', total:'סה"כ', capacity:'קיבולת יומית', commission:'עמלה %', status:'סטטוס', actions:'פעולות',
+    order:'הזמנה', date:'תאריך', delivery:'משלוח', assigned_to:'שליח/ה', auto:'שיבוץ אוטומטי', unassign:'ללא שליח', mark_paid:'סימון כשולם', stripe_pay:'תשלום ב-Stripe', history:'היסטוריית תשלומים', reference:'אסמכתא (מס׳ העברה / Bit)',
+    review:'לבדיקה', suspended:'מושהה', active:'פעיל', suspend:'השהיה', activate:'הפעלה', open_store:'החנות', in_shopify:'פתיחה ב-Shopify', site_price:'מחיר באתר', creator_price:'מחיר יוצר/ת', edited:'נערך אחרי אישור',
+    s_commission:'עמלת פלטפורמה (%)', s_uplift:'תוספת למחיר כל מוצר (₪) – מממנת משלוח חינם', s_fee:'תשלום לשליח למשלוח (₪)', s_auto:'שיבוץ אוטומטי של שליחים לפי עיר', s_cap:'סימון "אזל" כשיוצר/ת מגיע/ה לקיבולת היומית', s_email:'אימייל להתראות על בקשות חדשות', s_days:'ימי עסקים לבדיקת בקשה', s_cur:'מטבע תשלומים (Stripe)', resync:'סנכרון רשימת היוצרים', saved:'נשמר', done:'בוצע',
+    no_stripe:'Stripe לא מוגדר – אפשר לסמן תשלומים ידנית.', no_email:'שליחת אימיילים לא מוגדרת (RESEND_API_KEY / NOTIFY_FROM).', portal_links:'קישורים לאזורים האישיים', areas:'אזורים', delivered:'נמסרו', fee:'תשלום למשלוח (₪, ריק = ברירת מחדל)', products:'מוצרים', earnings:'הכנסות', week:'השבוע', month:'החודש', ytd:'מתחילת השנה', all_orders:'הזמנות',
+  },
+  en: { overview:'Overview', nav_apps:'Applications', nav_products:'Product approval', nav_creators:'Creators', nav_orders:'Orders', nav_couriers:'Couriers & deliveries', nav_payouts:'Payouts', nav_settings:'Settings',
+    k_apps:'Pending applications', k_products:'Products to review', k_orders:'Orders, last 24h', k_active:'Deliveries on the way', k_unassigned:'Deliveries without courier', k_owedC:'Owed to creators', k_owedK:'Owed to couriers', k_creators:'Active creators', k_couriers:'Active couriers', k_sales:'Creator sales (30d)', k_comm:'Commission (30d)',
+    recent:'Recent orders', none:'Nothing here', approve:'Approve', reject:'Reject', hide:'Hide', save:'Save', cancel:'Cancel', creator:'Creator', courier:'Courier', creators:'Creators', couriers:'Couriers', pending:'Pending', approved:'Approved', rejected:'Rejected', all:'All',
+    reason:'Reason (shown to the creator)', note:'Note (emailed, optional)', name:'Name', city:'City', email:'Email', phone:'Phone', live:'Live', owed:'Owed', total:'Total', capacity:'Daily capacity', commission:'Commission %', status:'Status', actions:'Actions',
+    order:'Order', date:'Date', delivery:'Delivery', assigned_to:'Courier', auto:'Auto-assign', unassign:'No courier', mark_paid:'Mark as paid', stripe_pay:'Pay with Stripe', history:'Payout history', reference:'Reference (transfer / Bit no.)',
+    review:'To review', suspended:'Suspended', active:'Active', suspend:'Suspend', activate:'Activate', open_store:'Store', in_shopify:'Open in Shopify', site_price:'Site price', creator_price:'Creator price', edited:'Edited after approval',
+    s_commission:'Platform commission (%)', s_uplift:'Added to every product price (₪) – funds free delivery', s_fee:'Courier pay per delivery (₪)', s_auto:'Auto-assign couriers by city', s_cap:'Mark creator products sold out at daily capacity', s_email:'Email for new-application alerts', s_days:'Business days to review an application', s_cur:'Payout currency (Stripe)', resync:'Resync creator list', saved:'Saved', done:'Done',
+    no_stripe:'Stripe is not configured – payouts can be marked manually.', no_email:'Email sending is not configured (RESEND_API_KEY / NOTIFY_FROM).', portal_links:'Portal links', areas:'Areas', delivered:'Delivered', fee:'Pay per delivery (₪, empty = default)', products:'Products', earnings:'Earnings', week:'This week', month:'This month', ytd:'Year to date', all_orders:'Orders',
+  },
+};
+const t = (k) => (T[LANG] && T[LANG][k]) || T.en[k] || k;
+document.documentElement.lang = LANG; document.documentElement.dir = LANG === 'he' ? 'rtl' : 'ltr';
+document.querySelectorAll('ui-nav-menu a[data-t]').forEach((a) => { a.textContent = t(a.dataset.t); });
+
+const app = document.getElementById('app');
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const ils = (c) => '₪' + (Math.round(Number(c || 0)) / 100).toLocaleString(LANG === 'he' ? 'he-IL' : 'en-US', { maximumFractionDigits: 2 });
+const amt = (n) => '₪' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString(LANG === 'he' ? 'he-IL' : 'en-US');
+const day = (s) => { if (!s) return ''; const d = new Date(String(s).replace(' ', 'T') + (/Z|\+/.test(s) ? '' : 'Z')); return isNaN(d) ? s : d.toLocaleString(LANG === 'he' ? 'he-IL' : 'en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jerusalem' }); };
+const toast = (m, bad) => { try { shopify.toast.show(m, { isError: !!bad }); } catch { alert(m); } };
+const B = (tone, txt) => `<span class="badge ${tone ? 'b-' + tone : ''}">${esc(txt)}</span>`;
+const ST = {
+  pending: ['warn', LANG === 'he' ? 'ממתין' : 'Pending'], approved: ['ok', LANG === 'he' ? 'פעיל' : 'Live'], edited: ['info', t('edited')], rejected: ['bad', LANG === 'he' ? 'נדחה' : 'Rejected'], hidden: ['', LANG === 'he' ? 'מוסתר' : 'Hidden'],
+  suspended: ['bad', t('suspended')],
+  unassigned: ['warn', LANG === 'he' ? 'ללא שליח' : 'Unassigned'], assigned: ['info', LANG === 'he' ? 'שובץ' : 'Assigned'], picked_up: ['info', LANG === 'he' ? 'בדרך' : 'On the way'], delivered: ['ok', LANG === 'he' ? 'נמסר' : 'Delivered'], failed: ['bad', LANG === 'he' ? 'בעיה' : 'Problem'],
+};
+const st = (s) => { const [tone, txt] = ST[s] || ['', s]; return B(tone, txt); };
+
+async function api(path, body) {
+  const token = await shopify.idToken();
+  const r = await fetch('/admin-api' + path, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({ ok: false, error: 'HTTP ' + r.status }));
+  if (!j.ok) throw new Error(j.error || 'Error');
+  return j;
+}
+async function act(btn, fn, okMsg) {
+  if (btn) btn.disabled = true;
+  try { const r = await fn(); toast(okMsg || t('done')); await route(); return r; }
+  catch (e) { toast(e.message, true); } finally { if (btn) btn.disabled = false; }
+}
+function ask(title, label, { required = false, value = '' } = {}) {
+  return new Promise((resolve) => {
+    const d = document.getElementById('dlg');
+    document.getElementById('dlg-t').textContent = title;
+    document.getElementById('dlg-b').innerHTML = `<div class="field"><label for="ask-in">${esc(label)}</label><textarea id="ask-in" rows="3">${esc(value)}</textarea></div>`;
+    document.getElementById('dlg-f').innerHTML = `<button class="btn" data-close>${t('cancel')}</button><button class="btn primary" id="ask-ok">${esc(title)}</button>`;
+    const done = (v) => { d.close(); resolve(v); };
+    d.querySelectorAll('[data-close]').forEach((b) => (b.onclick = () => done(null)));
+    document.getElementById('ask-ok').onclick = () => { const v = document.getElementById('ask-in').value.trim(); if (required && !v) return; done(v); };
+    d.showModal(); document.getElementById('ask-in').focus();
+  });
+}
+function modal(title, body, foot = '') {
+  const d = document.getElementById('dlg');
+  document.getElementById('dlg-t').textContent = title;
+  document.getElementById('dlg-b').innerHTML = body;
+  document.getElementById('dlg-f').innerHTML = foot + `<button class="btn" data-close>✕</button>`;
+  d.querySelectorAll('[data-close]').forEach((b) => (b.onclick = () => d.close()));
+  d.showModal(); return d;
+}
+const head = (title, extra = '') => `<div class="head"><h1>${esc(title)}</h1><div class="row">${extra}<button class="btn lang" id="lang">${LANG === 'he' ? 'English' : 'עברית'}</button></div></div>`;
+function bindLang() { const b = document.getElementById('lang'); if (b) b.onclick = () => { LANG = LANG === 'he' ? 'en' : 'he'; try { localStorage.setItem('mb_lang', LANG); } catch {} location.reload(); }; }
+
+/* ------------------------------ pages ------------------------------ */
+const pages = {
+  async '/'() {
+    const d = await api('/overview');
+    const k = d.counts;
+    const kpi = (label, val, go) => `<div class="kpi" ${go ? `data-go="${go}" role="link" tabindex="0"` : ''}><small>${esc(label)}</small><b class="num">${val}</b></div>`;
+    app.innerHTML = head(t('overview')) +
+      (!d.stripe ? `<div class="banner">${t('no_stripe')}</div>` : '') +
+      `<div class="kpis">${kpi(t('k_apps'), k.applications, '/applications')}${kpi(t('k_products'), k.products, '/products')}${kpi(t('k_orders'), k.orders24h, '/orders')}
+        ${kpi(t('k_active'), k.activeDeliveries, '/couriers')}${kpi(t('k_unassigned'), k.unassigned, '/couriers')}${kpi(t('k_owedC'), ils(k.owedCreators), '/payouts')}
+        ${kpi(t('k_owedK'), ils(k.owedCouriers), '/payouts')}${kpi(t('k_creators'), k.creators, '/creators')}${kpi(t('k_couriers'), k.couriers, '/couriers')}
+        ${kpi(t('k_sales'), ils(d.sales30.gross))}${kpi(t('k_comm'), ils(d.sales30.commission))}</div>
+      <div class="two"><div class="card"><h2>${t('recent')}</h2>${d.recent.length ? `<table><tr><th>${t('order')}</th><th>${t('date')}</th><th>${t('city')}</th><th>${t('total')}</th></tr>
+        ${d.recent.map((o) => `<tr><td><a href="${STORE_ADMIN}/orders/${o.order_id}" target="_top">${esc(o.order_name)}</a></td><td>${day(o.created_at)}</td><td>${esc(o.city)}</td><td class="num">${amt(o.total)}</td></tr>`).join('')}</table>` : `<div class="empty">${t('none')}</div>`}</div>
+      <div class="card"><h2>${t('portal_links')}</h2><p><a href="https://${SHOP}/apps/mb/creator" target="_blank">/apps/mb/creator</a><br><a href="https://${SHOP}/apps/mb/courier" target="_blank">/apps/mb/courier</a><br>
+        <a href="https://${SHOP}/pages/join-creators" target="_blank">/pages/join-creators</a><br><a href="https://${SHOP}/pages/join-couriers" target="_blank">/pages/join-couriers</a></p></div></div>`;
+    app.querySelectorAll('[data-go]').forEach((el) => { el.onclick = () => go(el.dataset.go); el.onkeydown = (e) => { if (e.key === 'Enter') go(el.dataset.go); }; });
+  },
+
+  async '/applications'() {
+    const q = new URLSearchParams(location.search);
+    const kind = q.get('kind') || 'creator', status = q.get('status') || 'pending';
+    const d = await api(`/applications?kind=${kind}&status=${status}`);
+    const tab = (k, v, label) => `<button aria-pressed="${q.get(k) === v || (!q.get(k) && (v === 'creator' || v === 'pending'))}" data-q="${k}=${v}">${label}</button>`;
+    const field = (k, v) => v && (Array.isArray(v) ? v.length : true) ? `<dt>${esc(k)}</dt><dd>${esc(Array.isArray(v) ? v.join(', ') : v)}</dd>` : '';
+    app.innerHTML = head(t('nav_apps')) +
+      `<div class="tabs">${tab('kind', 'creator', t('creators'))}${tab('kind', 'courier', t('couriers'))}<span style="width:16px"></span>
+        ${tab('status', 'pending', t('pending'))}${tab('status', 'approved', t('approved'))}${tab('status', 'rejected', t('rejected'))}${tab('status', 'all', t('all'))}</div>` +
+      (d.applications.length ? `<div class="apps">${d.applications.map((a) => {
+        const x = a.data || {};
+        return `<div class="card app"><div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(a.name)}</h2>${st(a.status)}</div>
+          <p class="muted">${day(a.created_at)}</p>
+          <dl>${field(t('email'), a.email)}${field(t('phone'), a.phone)}${field(t('city'), a.city)}
+            ${Object.entries(x).filter(([k]) => !['name', 'email', 'phone', 'city', 'kind'].includes(k)).map(([k, v]) => field(k, v)).join('')}
+            ${a.note ? field('note', a.note) : ''}</dl>
+          ${a.images.length ? `<div class="thumbs">${a.images.map((u) => `<a href="${esc(u)}" target="_blank"><img src="${esc(u)}" alt=""></a>`).join('')}</div>` : ''}
+          ${a.status === 'pending' ? `<div class="row"><button class="btn primary" data-ok="${a.id}">${t('approve')}</button><button class="btn danger" data-no="${a.id}">${t('reject')}</button></div>` : ''}</div>`;
+      }).join('')}</div>` : `<div class="card empty">${t('none')}</div>`);
+    app.querySelectorAll('[data-q]').forEach((b) => (b.onclick = () => { const [k, v] = b.dataset.q.split('='); q.set(k, v); go('/applications?' + q.toString()); }));
+    app.querySelectorAll('[data-ok]').forEach((b) => (b.onclick = () => act(b, () => api(`/applications/${b.dataset.ok}/approve`, {}))));
+    app.querySelectorAll('[data-no]').forEach((b) => (b.onclick = async () => { const note = await ask(t('reject'), t('note')); if (note === null) return; act(b, () => api(`/applications/${b.dataset.no}/reject`, { note })); }));
+  },
+
+  async '/products'() {
+    const q = new URLSearchParams(location.search); const status = q.get('status') || 'review';
+    const d = await api('/products?status=' + status);
+    const tab = (v, label) => `<button aria-pressed="${status === v}" data-s="${v}">${label}</button>`;
+    app.innerHTML = head(t('nav_products')) +
+      `<div class="tabs">${tab('review', t('review'))}${tab('approved', t('approved'))}${tab('rejected', t('rejected'))}${tab('all', t('all'))}</div>` +
+      (d.products.length ? d.products.map((p) => {
+        const x = p.data || {};
+        return `<div class="card prod"><img src="${esc(p.image_url || '')}" alt="" onerror="this.style.visibility='hidden'">
+          <div><div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(p.title)}</h2>${st(p.status)}</div>
+          <p class="muted">${esc(p.creator_name)} · ${day(p.updated_at)} · ${esc(x.category || '')}</p>
+          <p>${t('creator_price')}: <b class="num">${amt(p.creator_price)}</b> · ${t('site_price')}: <b class="num">${amt(p.list_price)}</b></p>
+          ${x.option ? `<p class="muted">${esc(x.option.name)}: ${x.option.values.map((v) => esc(v.name) + ' ' + amt(v.price)).join(' · ')}</p>` : ''}
+          ${x.description ? `<p class="muted" style="white-space:pre-line;max-height:7.5em;overflow:auto">${esc(x.description)}</p>` : ''}
+          ${p.reject_reason ? `<p class="muted">${t('reason')}: ${esc(p.reject_reason)}</p>` : ''}
+          <div class="row">${['pending', 'edited', 'rejected', 'hidden'].includes(p.status) ? `<button class="btn primary" data-ok="${p.id}">${t('approve')}</button>` : ''}
+            ${p.status !== 'rejected' ? `<button class="btn danger" data-no="${p.id}">${t('reject')}</button>` : ''}
+            ${['approved', 'edited'].includes(p.status) ? `<button class="btn" data-hide="${p.id}">${t('hide')}</button>` : ''}
+            ${p.shopify_product_id ? `<a class="btn" href="${STORE_ADMIN}/products/${p.shopify_product_id}" target="_top">${t('in_shopify')}</a>` : ''}</div></div></div>`;
+      }).join('') : `<div class="card empty">${t('none')}</div>`);
+    app.querySelectorAll('[data-s]').forEach((b) => (b.onclick = () => go('/products?status=' + b.dataset.s)));
+    app.querySelectorAll('[data-ok]').forEach((b) => (b.onclick = () => act(b, () => api(`/products/${b.dataset.ok}/approve`, {}))));
+    app.querySelectorAll('[data-no]').forEach((b) => (b.onclick = async () => { const reason = await ask(t('reject'), t('reason'), { required: true }); if (!reason) return; act(b, () => api(`/products/${b.dataset.no}/reject`, { reason })); }));
+    app.querySelectorAll('[data-hide]').forEach((b) => (b.onclick = () => act(b, () => api(`/products/${b.dataset.hide}/hide`, {}))));
+  },
+
+  async '/creators'() {
+    const d = await api('/creators');
+    app.innerHTML = head(t('nav_creators')) + `<div class="card">${d.creators.length ? `<table><tr><th>${t('name')}</th><th>${t('city')}</th><th>${t('live')}</th><th>${t('pending')}</th><th>${t('capacity')}</th><th>${t('owed')}</th><th>${t('status')}</th></tr>
+      ${d.creators.map((c) => `<tr class="click" data-id="${c.id}"><td><b>${esc(c.name)}</b><div class="muted">${esc(c.email)}</div></td><td>${esc(c.city)}</td><td>${c.live}</td><td>${c.pending}</td>
+        <td>${c.capacity_daily || '∞'}</td><td class="num">${ils(c.owed_cents)}</td><td>${c.status === 'approved' ? B('ok', t('active')) : B('bad', t('suspended'))}</td></tr>`).join('')}</table>`
+      : `<div class="empty">${t('none')}</div>`}</div>`;
+    app.querySelectorAll('tr[data-id]').forEach((r) => (r.onclick = () => creatorModal(r.dataset.id)));
+  },
+
+  async '/orders'() {
+    const d = await api('/orders');
+    app.innerHTML = head(t('nav_orders')) + `<div class="card">${d.orders.length ? `<table><tr><th>${t('order')}</th><th>${t('date')}</th><th>${t('city')}</th><th>${t('creators')}</th><th>${t('delivery')}</th><th>${t('assigned_to')}</th><th>${t('total')}</th></tr>
+      ${d.orders.map((o) => `<tr><td><a href="${STORE_ADMIN}/orders/${o.order_id}" target="_top">${esc(o.order_name)}</a><div class="muted">${esc(o.customer_name || '')}</div></td><td>${day(o.created_at)}</td><td>${esc(o.city)}</td>
+        <td>${o.creators.map(esc).join(', ')}</td><td>${o.delivery_status ? st(o.delivery_status) : '–'}</td><td>${esc(o.courier_name || '')}</td><td class="num">${amt(o.total)}</td></tr>`).join('')}</table>`
+      : `<div class="empty">${t('none')}</div>`}</div>`;
+  },
+
+  async '/couriers'() {
+    const [dd, cc] = await Promise.all([api('/deliveries?status=open'), api('/couriers')]);
+    const opts = (sel) => `<option value="">${t('unassign')}</option>` + cc.couriers.filter((k) => k.status === 'approved').map((k) => `<option value="${k.id}"${k.id === sel ? ' selected' : ''}>${esc(k.name)} (${esc(k.city || '')})</option>`).join('');
+    app.innerHTML = head(t('nav_couriers')) +
+      `<div class="card"><h2>${t('delivery')}</h2>${dd.deliveries.length ? `<table><tr><th>${t('order')}</th><th>${t('city')}</th><th>${t('status')}</th><th>${t('assigned_to')}</th><th>${t('actions')}</th></tr>
+        ${dd.deliveries.map((x) => `<tr><td>${esc(x.order_name)}<div class="muted">${day(x.created_at)}</div></td><td>${esc(x.city)}<div class="muted">${esc([x.address.address1, x.address.address2].filter(Boolean).join(', '))}</div></td><td>${st(x.status)}</td>
+          <td>${['unassigned', 'assigned'].includes(x.status) ? `<select data-assign="${x.id}" aria-label="${t('assigned_to')}">${opts(x.courier_id)}</select>` : esc(x.courier_name || '')}</td>
+          <td class="row">${x.status === 'unassigned' ? `<button class="btn" data-auto="${x.id}">${t('auto')}</button>` : ''}
+            ${x.status !== 'delivered' && x.courier_id ? `<button class="btn" data-del="${x.id}">✓ ${ST.delivered[1]}</button>` : ''}</td></tr>`).join('')}</table>` : `<div class="empty">${t('none')}</div>`}</div>
+      <div class="card"><h2>${t('couriers')}</h2>${cc.couriers.length ? `<table><tr><th>${t('name')}</th><th>${t('areas')}</th><th>${t('k_active')}</th><th>${t('delivered')}</th><th>${t('owed')}</th><th>${t('status')}</th></tr>
+        ${cc.couriers.map((k) => `<tr class="click" data-k="${k.id}"><td><b>${esc(k.name)}</b><div class="muted">${esc(k.phone || '')} · ${esc(k.vehicle || '')}</div></td><td>${k.areas.length ? esc(k.areas.slice(0, 5).join(', ')) + (k.areas.length > 5 ? ' +' + (k.areas.length - 5) : '') : esc(k.city)}</td>
+          <td>${k.active}</td><td>${k.delivered}</td><td class="num">${ils(k.owed_cents)}</td><td>${k.status === 'approved' ? B('ok', t('active')) : B('bad', t('suspended'))}</td></tr>`).join('')}</table>` : `<div class="empty">${t('none')}</div>`}</div>`;
+    app.querySelectorAll('[data-assign]').forEach((s) => (s.onchange = () => act(s, () => api(`/deliveries/${s.dataset.assign}/assign`, { courier_id: s.value || null }))));
+    app.querySelectorAll('[data-auto]').forEach((b) => (b.onclick = () => act(b, () => api(`/deliveries/${b.dataset.auto}/assign`, { courier_id: 'auto' }))));
+    app.querySelectorAll('[data-del]').forEach((b) => (b.onclick = () => { if (confirm(ST.delivered[1] + '?')) act(b, () => api(`/deliveries/${b.dataset.del}/status`, { status: 'delivered' })); }));
+    app.querySelectorAll('tr[data-k]').forEach((r) => (r.onclick = () => courierModal(cc.couriers.find((k) => String(k.id) === r.dataset.k))));
+  },
+
+  async '/payouts'() {
+    const d = await api('/earnings');
+    const rows = (list, party) => list.length ? `<table><tr><th>${t('name')}</th><th>${t('total')}</th><th>${t('owed')}</th><th>${t('actions')}</th></tr>
+      ${list.map((x) => `<tr><td><b>${esc(x.name)}</b><div class="muted">${esc(x.email)}</div></td><td class="num">${ils(x.total_cents)}</td><td class="num"><b>${ils(x.owed_cents)}</b></td>
+        <td class="row">${x.owed_cents > 0 ? `${d.stripe && x.stripe_account_id ? `<button class="btn primary" data-pay="${party}:${x.id}:stripe">${t('stripe_pay')}</button>` : ''}
+          <button class="btn" data-pay="${party}:${x.id}:manual">${t('mark_paid')}</button>` : ''}</td></tr>`).join('')}</table>` : `<div class="empty">${t('none')}</div>`;
+    app.innerHTML = head(t('nav_payouts')) + (!d.stripe ? `<div class="banner">${t('no_stripe')}</div>` : '') +
+      `<div class="card"><h2>${t('creators')}</h2>${rows(d.creators, 'creator')}</div><div class="card"><h2>${t('couriers')}</h2>${rows(d.couriers, 'courier')}</div>
+      <div class="card"><h2>${t('history')}</h2>${d.payouts.length ? `<table><tr><th>${t('date')}</th><th>${t('name')}</th><th>${t('total')}</th><th></th></tr>${d.payouts.map((p) =>
+        `<tr><td>${day(p.created_at)}</td><td>${esc(p.name || '')} <span class="muted">(${p.party === 'creator' ? t('creator') : t('courier')})</span></td><td class="num">${ils(p.amount_cents)}</td><td class="muted">${esc(p.method)} ${esc(p.reference || '')}</td></tr>`).join('')}</table>` : `<div class="empty">${t('none')}</div>`}</div>`;
+    app.querySelectorAll('[data-pay]').forEach((b) => (b.onclick = async () => {
+      const [party, id, method] = b.dataset.pay.split(':');
+      let reference = '';
+      if (method === 'manual') { reference = await ask(t('mark_paid'), t('reference')); if (reference === null) return; }
+      else if (!confirm(t('stripe_pay') + '?')) return;
+      act(b, () => api('/payout', { party, id, method, reference }));
+    }));
+  },
+
+  async '/settings'() {
+    const d = await api('/settings'); const s = d.settings;
+    const num = (k, label) => `<div class="field"><label for="s-${k}">${t(label)}</label><input type="number" min="0" step="0.5" id="s-${k}" name="${k}" value="${esc(s[k])}"></div>`;
+    const chk = (k, label) => `<div class="field"><label style="font-weight:500;display:flex;gap:8px;align-items:center"><input type="checkbox" name="${k}" ${s[k] === '1' ? 'checked' : ''}> ${t(label)}</label></div>`;
+    app.innerHTML = head(t('nav_settings')) + (!d.env.stripe ? `<div class="banner">${t('no_stripe')}</div>` : '') + (!d.env.email ? `<div class="banner warn">${t('no_email')}</div>` : '') +
+      `<form class="two" id="sf"><div class="card">${num('commission_pct', 's_commission')}${num('uplift_ils', 's_uplift')}${num('courier_fee_ils', 's_fee')}${num('review_days', 's_days')}
+        <div class="field"><label for="s-mail">${t('s_email')}</label><input type="email" id="s-mail" name="notify_email" value="${esc(s.notify_email)}"></div>
+        <div class="field"><label for="s-cur">${t('s_cur')}</label><input type="text" id="s-cur" name="payout_currency" value="${esc(s.payout_currency)}"></div>
+        ${chk('auto_assign_couriers', 's_auto')}${chk('enforce_capacity', 's_cap')}<button class="btn primary" type="submit">${t('save')}</button></div>
+        <div class="card"><h2>${t('resync')}</h2><p class="help">"Creators in your area" list on the store (metaobject mb_creator).</p><button class="btn" type="button" id="resync">${t('resync')}</button>
+        <p class="help" style="margin-top:14px">App proxy: <code>https://${esc(d.env.shop)}${esc(d.env.proxy)}</code></p></div></form>`;
+    document.getElementById('sf').onsubmit = (e) => {
+      e.preventDefault(); const f = e.target; const body = {};
+      f.querySelectorAll('input[name]').forEach((i) => { body[i.name] = i.type === 'checkbox' ? (i.checked ? '1' : '0') : i.value; });
+      act(f.querySelector('[type=submit]'), () => api('/settings', body), t('saved'));
+    };
+    document.getElementById('resync').onclick = (e) => act(e.target, async () => { const r = await api('/resync', {}); if (r.errors.length) toast(r.errors.join(' | '), true); return r; });
+  },
+};
+
+async function creatorModal(id) {
+  const d = await api('/creators/' + id); const c = d.creator, s = d.stats;
+  const dlg = modal(c.name, `<div class="kpis">${[[t('week'), s.week], [t('month'), s.month], [t('ytd'), s.ytd], [t('owed'), s.owed]].map(([l, v]) => `<div class="kpi"><small>${l}</small><b class="num">${ils(v)}</b></div>`).join('')}</div>
+    <p class="muted">${esc(c.email)} · ${esc(c.phone || '')} · ${esc(c.instagram || '')}</p>
+    <div class="field"><label for="m-cap">${t('capacity')} (0 = ∞)</label><input type="number" min="0" id="m-cap" value="${c.capacity_daily}"></div>
+    <div class="field"><label for="m-com">${t('commission')}</label><input type="number" min="0" max="100" step="0.5" id="m-com" value="${c.commission_pct ?? ''}" placeholder="—"></div>
+    <div class="field"><label for="m-city">${t('city')}</label><input type="text" id="m-city" value="${esc(c.city || '')}"></div>
+    <h2 style="margin-top:16px">${t('products')} (${d.products.length})</h2>${d.products.slice(0, 12).map((p) => `<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding:6px 0"><span>${esc(p.title)}</span>${st(p.status)}</div>`).join('')}`,
+    `<a class="btn" href="https://${SHOP}/collections/vendors?q=${encodeURIComponent(c.vendor)}" target="_blank">${t('open_store')}</a>
+     <button class="btn ${c.status === 'approved' ? 'danger' : ''}" id="m-st">${c.status === 'approved' ? t('suspend') : t('activate')}</button><button class="btn primary" id="m-save">${t('save')}</button>`);
+  dlg.querySelector('#m-save').onclick = (e) => act(e.target, () => api('/creators/' + id, { capacity_daily: dlg.querySelector('#m-cap').value, commission_pct: dlg.querySelector('#m-com').value, city: dlg.querySelector('#m-city').value })).then(() => dlg.close());
+  dlg.querySelector('#m-st').onclick = (e) => act(e.target, () => api('/creators/' + id, { status: c.status === 'approved' ? 'suspended' : 'approved', capacity_daily: c.capacity_daily, commission_pct: c.commission_pct ?? '' })).then(() => dlg.close());
+}
+function courierModal(k) {
+  const dlg = modal(k.name, `<p class="muted">${esc(k.email)} · ${esc(k.phone || '')} · ${esc(k.vehicle || '')} · ${esc(k.license || '')}</p>
+    <p>${t('areas')}: ${esc(k.areas.join(', ') || k.city)}</p>
+    <p class="muted">${esc((k.availability.days || []).join(', '))} ${esc(k.availability.from || '')}–${esc(k.availability.to || '')}</p>
+    <div class="field"><label for="k-fee">${t('fee')}</label><input type="number" min="0" id="k-fee" value="${k.fee_ils ?? ''}"></div>`,
+    `<button class="btn ${k.status === 'approved' ? 'danger' : ''}" id="k-st">${k.status === 'approved' ? t('suspend') : t('activate')}</button><button class="btn primary" id="k-save">${t('save')}</button>`);
+  dlg.querySelector('#k-save').onclick = (e) => act(e.target, () => api('/couriers/' + k.id, { fee_ils: dlg.querySelector('#k-fee').value })).then(() => dlg.close());
+  dlg.querySelector('#k-st').onclick = (e) => act(e.target, () => api('/couriers/' + k.id, { status: k.status === 'approved' ? 'suspended' : 'approved', fee_ils: k.fee_ils ?? '' })).then(() => dlg.close());
+}
+
+function go(path) { history.pushState({}, '', path + (path.includes('?') ? '&' : '?') + keepParams()); route(); }
+function keepParams() { const q = new URLSearchParams(location.search); const keep = new URLSearchParams(); ['shop', 'host', 'embedded', 'locale'].forEach((k) => q.get(k) && keep.set(k, q.get(k))); return keep.toString(); }
+async function route() {
+  const fn = pages[location.pathname] || pages['/'];
+  try { app.classList.add('spin'); await fn(); bindLang(); }
+  catch (e) { app.innerHTML = head('Mercado Bloom') + `<div class="banner bad">${esc(e.message)}</div>`; bindLang(); }
+  finally { app.classList.remove('spin'); }
+}
+window.addEventListener('popstate', route);
+route();
+</script>
+</body>
+</html>

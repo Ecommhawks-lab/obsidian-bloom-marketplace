@@ -1,25 +1,39 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "obsidian-bloom-marketplace",
-  "main": "worker.mjs",
+  "main": "src/index.mjs",
   "compatibility_date": "2024-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
-  // Bundle the HTML pages as text imports (served by the Worker).
-  "rules": [
-    { "type": "Text", "globs": ["**/*.html"], "fallthrough": false }
-  ],
+  // Turns src/ui/*.html into src/ui/generated.mjs before every deploy.
+  "build": { "command": "node scripts/build-ui.mjs" },
 
-  // Non-sensitive config only. This file is committed to a PUBLIC repo,
-  // so secrets (JWT_SECRET, ADMIN_TOKEN, ADMIN_EMAIL, ADMIN_PASSWORD,
-  // TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, STRIPE_SECRET,
-  // SHOPIFY_WEBHOOK_SECRET) are set as encrypted secrets in the
-  // Cloudflare dashboard, never here.
+  // Hourly: start a new day for creator capacity (Israel time) and refresh tokens.
+  "triggers": { "crons": ["5 * * * *"] },
+
+  // Public, non-secret values only. This repo is public.
+  // Secrets (set in Cloudflare → Worker → Settings → Variables and Secrets):
+  //   SHOPIFY_API_SECRET, TURSO_DATABASE_URL, TURSO_AUTH_TOKEN,
+  //   optional: STRIPE_SECRET, RESEND_API_KEY
   "vars": {
     "SHOP": "flowersmarketplace.myshopify.com",
-    "API_VERSION": "2024-10",
+    "SHOPIFY_API_KEY": "e7ae0461a5d1545cd8b1d88d0d5a9c2e",
+    "APP_URL": "https://obsidian-bloom-marketplace.mercado-bloom.workers.dev",
+    "API_VERSION": "2026-10",
+    "PROXY_PREFIX": "/apps/mb",
     "PRODUCT_TYPE": "Bouquet",
-    "PLATFORM_COMMISSION_PCT": "15"
+    "NOTIFY_FROM": ""
+  },
+
+  // Preview builds (non-main branches). Same public values; previews have no cron.
+  "previews": {
+    "vars": {
+      "SHOP": "flowersmarketplace.myshopify.com",
+      "API_VERSION": "2026-10",
+      "PROXY_PREFIX": "/apps/mb",
+      "PRODUCT_TYPE": "Bouquet",
+      "NOTIFY_FROM": ""
+    }
   }
 }

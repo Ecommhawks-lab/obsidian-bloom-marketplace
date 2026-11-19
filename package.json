@@ -1,13 +1,14 @@
 {
-  "name": "obsidian-bloom-marketplace",
-  "version": "2.0.0",
+  "name": "mercado-bloom-marketplace",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
-  "description": "Multi-tenant vendor marketplace on one Shopify store, running on Cloudflare Workers (Hono) with a Turso database.",
+  "description": "Mercado Bloom marketplace as a Shopify app: embedded admin dashboard, creator and courier portals (app proxy), approvals, earnings, Stripe payouts. Cloudflare Workers + Hono + Turso.",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "start": "wrangler dev"
+    "build:ui": "node scripts/build-ui.mjs",
+    "dev": "node scripts/build-ui.mjs && wrangler dev",
+    "deploy": "node scripts/build-ui.mjs && wrangler deploy",
+    "test": "node scripts/build-ui.mjs && node test/run.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
@@ -15,6 +16,6 @@
     "jose": "^5.9.6"
   },
   "devDependencies": {
-    "wrangler": "^3.80.0"
+    "wrangler": "^4.165.0"
   }
 }
