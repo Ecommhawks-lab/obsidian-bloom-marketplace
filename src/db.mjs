@@ -51,7 +51,8 @@ export function makeDb(env) {
 
 export const DEFAULT_SETTINGS = {
   commission_pct: '23',        // platform commission on the creator's price (business plan: 23%)
-  uplift_ils: '25',            // added on top of the creator's price (covers free delivery)
+  uplift_ils: '25',            // delivery cost per product: charged at checkout, or paid by the creator when they offer free shipping
+  categories: 'פרחים\nזרים\nעציצים\nפרחים מיובשים\nמתנות\nעיצוב לבית\nקרמיקה\nטקסטיל\nתכשיטים', // one per line; "אחר" is always added
   courier_fee_ils: '25',       // paid to the courier per delivered order
   auto_assign_couriers: '1',   // assign new orders to a courier who covers the city
   enforce_capacity: '1',       // creator products sell out when daily capacity is reached
@@ -156,6 +157,10 @@ export async function ensureSchema(env) {
   `);
   // Added after first release: planned delivery day (Fri/Sat orders move to Sunday).
   try { await client.execute('ALTER TABLE mb_deliveries ADD COLUMN deliver_on TEXT'); } catch { /* already there */ }
+  // Creator store card (Wolt-style): 4:3 cover / promo image and a short promo line.
+  for (const col of ['banner_url TEXT', 'banner_file_id TEXT', 'promo TEXT']) {
+    try { await client.execute('ALTER TABLE mb_creators ADD COLUMN ' + col); } catch { /* already there */ }
+  }
   await migrateLegacy(makeDb(env));
   initialized = true;
 }
@@ -201,6 +206,13 @@ async function migrateLegacy(db) {
     }
   }
   await db.setSetting('legacy_migrated', new Date().toISOString());
+}
+
+// Admin-managed product categories (Settings). "אחר" (other) is always last.
+export function categoryList(settings) {
+  const list = String(settings?.categories ?? DEFAULT_SETTINGS.categories).split(/\n|,/).map((x) => x.trim()).filter(Boolean)
+    .filter((x) => x !== 'אחר');
+  return [...new Set(list), 'אחר'];
 }
 
 export function slugify(s) {

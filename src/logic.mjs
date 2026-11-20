@@ -132,8 +132,13 @@ export async function applyCapacity(env, creatorId) {
   const c = await db.get('SELECT * FROM mb_creators WHERE id = ?', [creatorId]);
   if (!c) return;
   const qty = s.enforce_capacity === '1' ? await remainingToday(db, c) : UNLIMITED;
-  const gids = (await db.all(`SELECT shopify_gid FROM mb_products WHERE creator_id = ? AND shopify_gid IS NOT NULL AND status != 'rejected'`, [creatorId])).map((r) => r.shopify_gid);
-  await makeAdmin(env).setAvailable(gids, qty);
+  const rows = await db.all(`SELECT shopify_gid, data FROM mb_products WHERE creator_id = ? AND shopify_gid IS NOT NULL AND status != 'rejected'`, [creatorId]);
+  const stockOf = Object.fromEntries(rows.map((r) => [r.shopify_gid, variantStock(r.data)]));
+  // Per variant: the creator's remaining stock (if they set one), capped by today's capacity.
+  await makeAdmin(env).setAvailable(rows.map((r) => r.shopify_gid), (gid, title) => {
+    const st = stockOf[gid]?.(title);
+    return st == null ? qty : Math.min(qty, st);
+  });
   return qty;
 }
 export async function dailyReset(env) {
@@ -145,6 +150,26 @@ export async function dailyReset(env) {
   for (const c of limited) { try { await applyCapacity(env, c.id); } catch (e) { console.error('reset', c.id, e); } }
   await db.run(`DELETE FROM mb_capacity WHERE day < date('now','-60 days')`);
   return true;
+}
+
+// Creator stock saved with the product: data.stock (single) or data.option.values[].stock.
+// Returns fn(variantTitle) => remaining units, or null when not limited.
+export function variantStock(raw) {
+  let d; try { d = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {}); } catch { d = {}; }
+  const lim = (v) => (v === null || v === undefined || v === '' ? null : Math.max(0, Number(v) || 0));
+  return (title) => {
+    if (d.option?.values?.length) return lim(d.option.values.find((v) => v.name === title)?.stock);
+    return lim(d.stock);
+  };
+}
+async function decrementStock(db, product, variantTitle, qty) {
+  let d; try { d = JSON.parse(product.data || '{}'); } catch { return; }
+  let changed = false;
+  if (d.option?.values?.length) {
+    const v = d.option.values.find((x) => x.name === variantTitle);
+    if (v && v.stock != null && v.stock !== '') { v.stock = Math.max(0, Number(v.stock) - qty); changed = true; }
+  } else if (d.stock != null && d.stock !== '') { d.stock = Math.max(0, Number(d.stock) - qty); changed = true; }
+  if (changed) await db.run('UPDATE mb_products SET data = ? WHERE id = ?', [JSON.stringify(d), product.id]);
 }
 
 /* ------------------------------ orders ------------------------------ */
@@ -161,12 +186,17 @@ export async function processOrder(env, order) {
     const p = await db.get('SELECT * FROM mb_products WHERE shopify_product_id = ?', [String(li.product_id)]);
     if (!p) continue;
     const qty = Number(li.quantity || 1);
-    const unit = Math.max(0, Number(li.price) - Number(p.uplift || 0)); // creator keeps price minus the delivery uplift
+    let mode = null; try { mode = JSON.parse(p.data || '{}').shipping || null; } catch { /* legacy */ }
+    // Legacy products had the delivery cost added to the price; new ones sell at the creator's price
+    // and either the client pays delivery at checkout ("paid") or the creator funds it ("free").
+    const unit = mode ? Number(li.price) : Math.max(0, Number(li.price) - Number(p.uplift || 0));
     const cents = Math.round(unit * 100) * qty;
-    (perCreator[p.creator_id] ||= { cents: 0, units: 0 });
+    (perCreator[p.creator_id] ||= { cents: 0, units: 0, free: false });
     perCreator[p.creator_id].cents += cents;
     perCreator[p.creator_id].units += qty;
+    if (mode === 'free') perCreator[p.creator_id].free = Math.max(perCreator[p.creator_id].free || 0, Number(p.uplift || 0));
     lines.push({ title: li.title, variant: li.variant_title || '', qty, creator_id: p.creator_id, product_id: String(li.product_id) });
+    try { await decrementStock(db, p, li.variant_title || 'Default Title', qty); } catch (e) { console.error('stock', e); }
   }
   const ship = order.shipping_address || order.billing_address || {};
   const city = (ship.city || '').trim();
@@ -179,14 +209,17 @@ export async function processOrder(env, order) {
      JSON.stringify(lines), order.created_at ? toSqlTime(order.created_at) : null]
   );
   const day = israelDay(order.created_at ? new Date(order.created_at) : new Date());
+  const shippingPaid = Number(order.total_shipping_price_set?.shop_money?.amount ?? order.shipping_lines?.reduce((a, l) => a + Number(l.price || 0), 0) ?? 0) > 0;
   for (const [cid, v] of Object.entries(perCreator)) {
     const creator = await db.get('SELECT * FROM mb_creators WHERE id = ?', [cid]);
     const pct = creator?.commission_pct != null ? Number(creator.commission_pct) : commissionDefault;
     const commission = Math.round(v.cents * pct / 100);
+    // Free shipping offered by the creator: the delivery cost comes out of their share (once per order).
+    const delivery = v.free && !shippingPaid ? Math.round(v.free * 100) : 0;
     await db.run(
       `INSERT OR IGNORE INTO mb_earnings (creator_id, order_id, order_name, gross_cents, commission_cents, net_cents, currency)
        VALUES (?,?,?,?,?,?,?)`,
-      [Number(cid), orderId, order.name || '', v.cents, commission, v.cents - commission, (order.currency || 'ILS').toLowerCase()]
+      [Number(cid), orderId, order.name || '', v.cents, commission, Math.max(0, v.cents - commission - delivery), (order.currency || 'ILS').toLowerCase()]
     );
     await db.run(
       `INSERT INTO mb_capacity (creator_id, day, units) VALUES (?,?,?)

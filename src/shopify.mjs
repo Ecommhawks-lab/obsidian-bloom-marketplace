@@ -214,21 +214,23 @@ export function makeAdmin(env, shop) {
     // tags, status, option?: {name, values:[{name, price, compareAt}]}, price, compareAt, files?: [url], quantity, metafields }
     async saveProduct(p) {
       const loc = await locationId();
-      const qty = [{ locationId: loc, name: 'available', quantity: Math.max(0, p.quantity ?? 9999) }];
+      // Available = the creator's stock for that variant (if set), capped by today's capacity.
+      const qty = (stock) => [{ locationId: loc, name: 'available',
+        quantity: Math.max(0, Math.min(p.quantity ?? 9999, stock == null || stock === '' ? 9999 : Number(stock))) }];
       let productOptions, variants;
       if (p.option && p.option.values?.length) {
         productOptions = [{ name: p.option.name, values: p.option.values.map((v) => ({ name: v.name })) }];
         variants = p.option.values.map((v) => ({
           optionValues: [{ optionName: p.option.name, name: v.name }],
           price: money(v.price), ...(v.compareAt ? { compareAtPrice: money(v.compareAt) } : {}),
-          inventoryItem: { tracked: true }, inventoryPolicy: 'DENY', inventoryQuantities: qty,
+          inventoryItem: { tracked: true }, inventoryPolicy: 'DENY', inventoryQuantities: qty(v.stock),
         }));
       } else {
         productOptions = [{ name: 'Title', values: [{ name: 'Default Title' }] }];
         variants = [{
           optionValues: [{ optionName: 'Title', name: 'Default Title' }],
           price: money(p.price), ...(p.compareAt ? { compareAtPrice: money(p.compareAt) } : {}),
-          inventoryItem: { tracked: true }, inventoryPolicy: 'DENY', inventoryQuantities: qty,
+          inventoryItem: { tracked: true }, inventoryPolicy: 'DENY', inventoryQuantities: qty(p.stock),
         }];
       }
       const input = {
@@ -240,7 +242,7 @@ export function makeAdmin(env, shop) {
       const d = await gql(
         `mutation($input: ProductSetInput!, $identifier: ProductSetIdentifiers) {
            productSet(input: $input, identifier: $identifier, synchronous: true) {
-             product { id handle status featuredMedia { preview { image { url } } } }
+             product { id handle status featuredMedia { preview { image { url } } } variants(first: 100) { nodes { id } } }
              userErrors { field message }
            }
          }`,
@@ -248,7 +250,8 @@ export function makeAdmin(env, shop) {
       );
       const e = userErr(d.productSet, 'userErrors'); if (e) throw new Error(e);
       const prod = d.productSet.product;
-      return { gid: prod.id, id: prod.id.split('/').pop(), handle: prod.handle, image: prod.featuredMedia?.preview?.image?.url || null };
+      return { gid: prod.id, id: prod.id.split('/').pop(), handle: prod.handle, image: prod.featuredMedia?.preview?.image?.url || null,
+        variantIds: (prod.variants?.nodes || []).map((v) => v.id) };
     },
 
     async productMedia(gid) {
@@ -281,13 +284,16 @@ export function makeAdmin(env, shop) {
     },
 
     // Set "available" for every variant of the given products (daily capacity).
+    // quantity: a number, or fn(productGid, variantTitle) => number (creator stock capped by capacity).
     async setAvailable(gids, quantity) {
       if (!gids.length) return;
       const loc = await locationId();
       const items = [];
       for (const id of gids) {
-        const d = await gql(`query($id: ID!) { product(id: $id) { variants(first: 100) { nodes { inventoryItem { id } } } } }`, { id });
-        for (const v of d.product?.variants?.nodes || []) items.push(v.inventoryItem.id);
+        const d = await gql(`query($id: ID!) { product(id: $id) { variants(first: 100) { nodes { title inventoryItem { id } } } } }`, { id });
+        for (const v of d.product?.variants?.nodes || []) {
+          items.push({ id: v.inventoryItem.id, q: typeof quantity === 'function' ? quantity(id, v.title) : quantity });
+        }
       }
       for (let i = 0; i < items.length; i += 100) {
         const chunk = items.slice(i, i + 100);
@@ -296,11 +302,45 @@ export function makeAdmin(env, shop) {
              inventorySetQuantities(input: $input) @idempotent(key: $key) { userErrors { code message } }
            }`,
           { input: { name: 'available', reason: 'correction', referenceDocumentUri: 'gid://mercado-bloom/Capacity/' + Date.now(),
-              quantities: chunk.map((inventoryItemId) => ({ inventoryItemId, locationId: loc, quantity: Math.max(0, quantity), changeFromQuantity: null })) },
+              quantities: chunk.map((it) => ({ inventoryItemId: it.id, locationId: loc, quantity: Math.max(0, Number(it.q) || 0), changeFromQuantity: null })) },
             key: crypto.randomUUID() }
         );
         const e = userErr(d.inventorySetQuantities, 'userErrors'); if (e) throw new Error(e);
       }
+    },
+
+    // "Client pays delivery": products go to a separate delivery profile with a fixed Israel rate.
+    // "Free shipping" products stay in the store's general (free) profile.
+    async deliveryProfiles(priceIls) {
+      const NAME = 'Mercado Bloom – משלוח בתשלום';
+      const d = await gql(`{ deliveryProfiles(first: 20) { nodes { id name default } } }`);
+      const def = d.deliveryProfiles.nodes.find((n) => n.default)?.id;
+      let paid = d.deliveryProfiles.nodes.find((n) => n.name === NAME)?.id;
+      if (!paid) {
+        const loc = await locationId();
+        const c = await gql(
+          `mutation($profile: DeliveryProfileInput!) { deliveryProfileCreate(profile: $profile) { profile { id } userErrors { field message } } }`,
+          { profile: { name: NAME, locationGroupsToCreate: [{ locations: [loc], zonesToCreate: [{
+              name: 'ישראל', countries: [{ code: 'IL', includeAllProvinces: true }],
+              methodDefinitionsToCreate: [{ name: 'משלוח עד הבית', active: true, rateDefinition: { price: { amount: money(priceIls), currencyCode: 'ILS' } } }],
+            }] }] } }
+        );
+        const e = userErr(c.deliveryProfileCreate, 'userErrors'); if (e) throw new Error('deliveryProfileCreate: ' + e);
+        paid = c.deliveryProfileCreate.profile.id;
+      }
+      return { paid, def };
+    },
+    // paid = client pays delivery at checkout; otherwise the store's general (free) profile.
+    async setDeliveryMode(variantIds, paid, priceIls) {
+      if (!variantIds?.length) return;
+      const p = await this.deliveryProfiles(priceIls);
+      const id = paid ? p.paid : p.def;
+      if (!id) throw new Error('No default delivery profile');
+      const r = await gql(
+        `mutation($id: ID!, $profile: DeliveryProfileInput!) { deliveryProfileUpdate(id: $id, profile: $profile) { profile { id } userErrors { field message } } }`,
+        { id, profile: { variantsToAssociate: variantIds } }
+      );
+      const e = userErr(r.deliveryProfileUpdate, 'userErrors'); if (e) throw new Error('deliveryProfileUpdate: ' + e);
     },
 
     async customerByEmail(email) {
@@ -344,6 +384,8 @@ export function makeAdmin(env, shop) {
         { key: 'approved', value: approved ? 'true' : 'false' },
       ];
       if (creator.logo_file_id) fields.push({ key: 'logo', value: creator.logo_file_id });
+      if (creator.banner_file_id) fields.push({ key: 'banner', value: creator.banner_file_id });
+      fields.push({ key: 'promo', value: creator.promo || '' });
       const d = await gql(
         `mutation($handle: MetaobjectHandleInput!, $metaobject: MetaobjectUpsertInput!) {
            metaobjectUpsert(handle: $handle, metaobject: $metaobject) { metaobject { id } userErrors { field message } }
