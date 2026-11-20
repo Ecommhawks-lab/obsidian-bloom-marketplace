@@ -27,7 +27,8 @@ export function layout(ctx, { title, nav = null, active = '', body, data = {} })
   const navHtml = links.length ? `<nav class="mbp-nav" aria-label="ניווט אזור אישי">${links.map(([p, t]) =>
     `<a href="${base}${p}"${active === p ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>` : '';
   const attrs = Object.entries(data).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
-  return `<style>${PORTAL_CSS}</style>
+  return `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap">
+<style>${PORTAL_CSS}</style>
 <div class="mbp" data-prefix="${esc(ctx.prefix)}"${attrs}>
   <div class="mbp-wrap">
     <div class="mbp-top"><div><h1>${esc(title)}</h1>${ctx.who ? `<p class="mbp-sub">${esc(ctx.who)}</p>` : ''}</div></div>
@@ -121,8 +122,11 @@ export function creatorProducts(ctx, { products }) {
     </div>` });
 }
 
-export function productEditor(ctx, { product, media, settings }) {
+export function productEditor(ctx, { product, media, settings, categories = CATEGORIES }) {
   const d = product?.data || {};
+  const ship = d.shipping === 'paid' ? 'paid' : 'free';
+  const delivery = Number(settings.uplift_ils) || 0;
+  const cats = categories.includes(d.category || '') || !d.category ? categories : [...categories.slice(0, -1), d.category, 'אחר'];
   const opt = d.option && d.option.values?.length ? d.option : null;
   const status = product ? `<div class="mbp-card"><h2>סטטוס</h2>${badge(PRODUCT_STATUS, product.status)}
       ${product.status === 'rejected' && product.reject_reason ? `<p class="mbp-help">סיבת הדחייה: ${esc(product.reject_reason)}. אפשר לתקן ולשמור – המוצר יחזור לבדיקה.</p>` : ''}
@@ -131,7 +135,7 @@ export function productEditor(ctx, { product, media, settings }) {
     : `<div class="mbp-card"><h2>סטטוס</h2><p class="mbp-help">אחרי השמירה המוצר יישלח לאישור ויעלה לחנות לאחר שנאשר אותו.</p></div>`;
   return layout(ctx, {
     title: product ? 'עריכת מוצר' : 'מוצר חדש', nav: 'creator', active: product ? '/products' : '/products/new',
-    data: { uplift: settings.uplift_ils, commission: ctx.commission },
+    data: { uplift: delivery, commission: ctx.commission },
     body: `
     <form id="mbp-product" ${product ? `data-id="${product.id}"` : ''} novalidate>
       <div class="mbp-grid mbp-grid--2">
@@ -147,25 +151,45 @@ export function productEditor(ctx, { product, media, settings }) {
             <p class="mbp-help">תמונות JPG או PNG, רצוי מרובעות. התמונה הראשונה היא הראשית.</p>
             <script type="application/json" id="mbp-media-data">${JSON.stringify((media || []).map((u) => ({ url: u }))).replace(/</g, '\\u003c')}</script>
           </div>
-          <div class="mbp-card"><h2>תמחור</h2>
-            <div class="mbp-single-price"><div class="mbp-row">
-              <div class="mbp-field"><label class="mbp-label" for="mbp-price">המחיר שלך (₪)</label>
-                <input class="mbp-in" id="mbp-price" name="price" type="number" min="0" step="1" inputmode="decimal" value="${esc(d.price ?? product?.creator_price ?? '')}"></div>
-              <div class="mbp-field"><label class="mbp-label" for="mbp-cmp">מחיר לפני הנחה (רשות)</label>
-                <input class="mbp-in" id="mbp-cmp" name="compareAt" type="number" min="0" step="1" inputmode="decimal" value="${esc(d.compareAt ?? '')}"></div>
-            </div></div>
-            <p class="mbp-price-preview" aria-live="polite"></p>
+          <div class="mbp-card"><h2>תמחור ומלאי</h2>
+            <div class="mbp-single-price">
+              <div class="mbp-row">
+                <div class="mbp-field"><label class="mbp-label" for="mbp-price">מחיר ללקוח (₪)</label>
+                  <input class="mbp-in" id="mbp-price" name="price" type="number" min="0" step="1" inputmode="decimal" placeholder="0" value="${esc(d.price ?? product?.creator_price ?? '')}"></div>
+                <div class="mbp-field"><label class="mbp-label" for="mbp-cmp">מחיר לפני הנחה (רשות)</label>
+                  <input class="mbp-in" id="mbp-cmp" name="compareAt" type="number" min="0" step="1" inputmode="decimal" placeholder="—" value="${esc(d.compareAt ?? '')}"></div>
+              </div>
+              <div class="mbp-field"><label class="mbp-label" for="mbp-stock">כמות זמינה במלאי</label>
+                <input class="mbp-in" id="mbp-stock" name="stock" type="number" min="0" step="1" inputmode="numeric" placeholder="ללא הגבלה" value="${esc(d.stock ?? '')}">
+                <p class="mbp-help">ריק = ללא הגבלה. כשהכמות נגמרת המוצר מסומן "אזל".</p></div>
+            </div>
+            <div class="mbp-box" role="radiogroup" aria-labelledby="mbp-ship-l">
+              <span class="mbp-label" id="mbp-ship-l">משלוח</span>
+              <label class="mbp-radio"><input type="radio" name="shipping" value="free"${ship === 'free' ? ' checked' : ''}>
+                <span><b>משלוח חינם ללקוח – אני מממן/ת</b><small>${ilsAmount(delivery)} להזמנה יורדים מהתשלום שלי. המוצר מסומן "משלוח חינם" באתר.</small></span></label>
+              <label class="mbp-radio"><input type="radio" name="shipping" value="paid"${ship === 'paid' ? ' checked' : ''}>
+                <span><b>הלקוח משלם משלוח</b><small>${ilsAmount(delivery)} נוספים ללקוח בקופה.</small></span></label>
+              <p class="mbp-tip" data-ship-tip${ship === 'paid' ? '' : ' hidden'}>💡 משלוח חינם מעלה משמעותית את אחוז ההמרה: לקוחות מעדיפים מוצרים עם משלוח חינם ובוחרים בהם על פני יוצרים אחרים באזור. שקלו לגלם את המשלוח במחיר ולהציע משלוח חינם.</p>
+            </div>
+            <div class="mbp-field" style="margin:0"><label class="mbp-label" for="mbp-cost">עלות המוצר עבורך – חומרים ואריזה (רשות, לא מוצג ללקוח)</label>
+              <input class="mbp-in" id="mbp-cost" name="cost" type="number" min="0" step="1" inputmode="decimal" placeholder="0" value="${esc(d.cost ?? '')}"></div>
+            <table class="mbp-profit" aria-live="polite"><tbody></tbody></table>
+            <p class="mbp-help">חישוב הרווח לפי ההזמנה של המחיר הנמוך ביותר. העמלה מחושבת על מחיר המוצר.</p>
           </div>
           <div class="mbp-card"><h2>אפשרויות</h2>
             <label class="mbp-check"><input type="checkbox" id="mbp-has-option" ${opt ? 'checked' : ''}> למוצר יש אפשרויות כמו גודל או כמות פרחים</label>
             <div class="mbp-options" hidden>
               <div class="mbp-field"><label class="mbp-label" for="mbp-optname">שם האפשרות</label>
                 <input class="mbp-in" id="mbp-optname" name="optName" value="${esc(opt?.name || 'גודל')}"></div>
+              <div class="mbp-opt-head"><span>ערך</span><span>מחיר (₪)</span><span>לפני הנחה</span><span>כמות במלאי</span><span></span></div>
               <div class="mbp-opt-rows">${(opt?.values || []).map((v) => `<div class="mbp-opt-row">
-                <input class="mbp-in" name="ov" value="${esc(v.name)}" aria-label="ערך"><input class="mbp-in" name="op" type="number" min="0" step="1" value="${esc(v.price)}" aria-label="מחיר">
-                <input class="mbp-in" name="oc" type="number" min="0" step="1" value="${esc(v.compareAt || '')}" aria-label="מחיר לפני הנחה">
+                <input class="mbp-in" name="ov" value="${esc(v.name)}" placeholder="ערך, למשל: גדול" aria-label="ערך">
+                <input class="mbp-in" name="op" type="number" min="0" step="1" inputmode="decimal" value="${esc(v.price)}" placeholder="מחיר" aria-label="מחיר">
+                <input class="mbp-in" name="oc" type="number" min="0" step="1" inputmode="decimal" value="${esc(v.compareAt || '')}" placeholder="לפני הנחה" aria-label="מחיר לפני הנחה">
+                <input class="mbp-in" name="os" type="number" min="0" step="1" inputmode="numeric" value="${esc(v.stock ?? '')}" placeholder="מלאי" aria-label="כמות במלאי">
                 <button type="button" class="mbp-icon-btn" data-del aria-label="מחיקת שורה">×</button></div>`).join('')}</div>
               <button type="button" class="mbp-btn mbp-btn--ghost" data-add-row>+ הוספת ערך</button>
+              <p class="mbp-help">מלאי ריק = ללא הגבלה.</p>
             </div>
           </div>
         </div>
@@ -173,7 +197,10 @@ export function productEditor(ctx, { product, media, settings }) {
           ${status}
           <div class="mbp-card"><h2>ארגון המוצר</h2>
             <div class="mbp-field"><label class="mbp-label" for="mbp-cat">קטגוריה</label>
-              <select id="mbp-cat" name="category">${CATEGORIES.map((c) => `<option${(d.category || '') === c ? ' selected' : ''}>${c}</option>`).join('')}</select></div>
+              <select id="mbp-cat" name="category">${cats.map((c) => `<option${(d.category || '') === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
+              <div data-cat-other${(d.category || '') === 'אחר' ? '' : ' hidden'} style="margin-top:8px">
+                <input class="mbp-in" name="categorySuggest" maxlength="40" value="${esc(d.categorySuggest || '')}" placeholder="איזו קטגוריה חסרה? נבדוק ונוסיף">
+              </div></div>
             <div class="mbp-field" style="margin:0"><label class="mbp-label" for="mbp-tags">תגיות</label>
               <input class="mbp-in" id="mbp-tags" name="tags" value="${esc((d.tags || []).join(', '))}" placeholder="ורדים, יום הולדת">
               <p class="mbp-help">מופרדות בפסיק. עוזרות ללקוחות למצוא את המוצר.</p></div>
@@ -205,6 +232,14 @@ export function creatorProfile(ctx, { creator, cities, stripe }) {
           <div class="mbp-field" style="display:flex;gap:14px;align-items:center">
             <img class="mbp-logo" src="${esc(creator.logo_url || '')}" alt="" onerror="this.style.visibility='hidden'">
             <div><label class="mbp-label" for="mbp-logo">לוגו</label><input id="mbp-logo" type="file" accept="image/*" data-logo></div></div>
+          <div class="mbp-field"><span class="mbp-label">כרטיס החנות באתר</span>
+            <div class="mbp-store"><div class="mbp-store__cover" style="background-image:url('${esc(creator.banner_url || '')}')">
+              ${creator.promo ? `<span class="mbp-store__promo">${esc(creator.promo)}</span>` : ''}</div>
+              <div class="mbp-store__row"><img src="${esc(creator.logo_url || '')}" alt="" onerror="this.style.visibility='hidden'"><b>${esc(creator.name)}</b><span class="mbp-muted">${esc(creator.city || '')}</span></div></div>
+            <label class="mbp-label" for="mbp-banner" style="margin-top:10px">תמונת שער / פרסומת (יחס 4:3, למשל 1200×900)</label>
+            <input id="mbp-banner" type="file" accept="image/*" data-banner></div>
+          <div class="mbp-field"><label class="mbp-label" for="mbp-promo">שורת מבצע על הכרטיס (רשות)</label>
+            <input class="mbp-in" id="mbp-promo" name="promo" maxlength="60" value="${esc(creator.promo || '')}" placeholder="למשל: 10% הנחה על זרים השבוע"></div>
           <div class="mbp-field"><label class="mbp-label">שם החנות</label><input class="mbp-in" value="${esc(creator.name)}" disabled>
             <p class="mbp-help">לשינוי שם החנות צרו קשר – השם מופיע על כל המוצרים.</p></div>
           <div class="mbp-field"><label class="mbp-label" for="mbp-city">עיר</label>

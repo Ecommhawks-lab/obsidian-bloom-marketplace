@@ -50,6 +50,22 @@ dialog{border:0;border-radius:14px;padding:0;max-width:640px;width:calc(100% - 2
 dialog .dh{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
 dialog .db{padding:16px;max-height:70vh;overflow:auto}dialog .df{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
 .lang{font-size:12px}
+.card{overflow-x:auto}
+@media(max-width:640px){
+  main{padding:12px 10px 60px}
+  dialog{width:100%;max-width:100%;height:100%;max-height:100%;margin:0;border-radius:0}
+  dialog[open]{display:flex;flex-direction:column}
+  dialog .db{max-height:none;flex:1 1 auto}
+  dialog .df{flex-wrap:wrap}dialog .df .btn{flex:1 1 40%;justify-content:center;min-height:44px}
+  dialog .kpis{grid-template-columns:1fr 1fr}
+  .kpis{grid-template-columns:1fr 1fr}
+  table.resp tr:first-child{display:none}
+  table.resp tr{display:block;border-top:1px solid var(--line);padding:8px 0}
+  table.resp td{display:inline-block;border:0;padding:2px 8px 2px 0}
+  table.resp td:first-child{display:block}
+  .prod{grid-template-columns:72px 1fr}.prod img{width:72px;height:72px}
+  .two{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -81,7 +97,7 @@ const T = {
     reason:'סיבה (תוצג ליוצר/ת)', note:'הערה (תישלח במייל, רשות)', name:'שם', city:'עיר', email:'אימייל', phone:'טלפון', live:'פעילים', owed:'לתשלום', total:'סה"כ', capacity:'קיבולת יומית', commission:'עמלה %', status:'סטטוס', actions:'פעולות',
     order:'הזמנה', date:'תאריך', delivery:'משלוח', assigned_to:'שליח/ה', auto:'שיבוץ אוטומטי', unassign:'ללא שליח', mark_paid:'סימון כשולם', stripe_pay:'תשלום ב-Stripe', history:'היסטוריית תשלומים', reference:'אסמכתא (מס׳ העברה / Bit)',
     review:'לבדיקה', suspended:'מושהה', active:'פעיל', suspend:'השהיה', activate:'הפעלה', open_store:'החנות', in_shopify:'פתיחה ב-Shopify', site_price:'מחיר באתר', creator_price:'מחיר יוצר/ת', edited:'נערך אחרי אישור',
-    s_commission:'עמלת פלטפורמה (%)', s_uplift:'תוספת למחיר כל מוצר (₪) – מממנת משלוח חינם', s_fee:'תשלום לשליח למשלוח (₪)', s_auto:'שיבוץ אוטומטי של שליחים לפי עיר', s_cap:'סימון "אזל" כשיוצר/ת מגיע/ה לקיבולת היומית', s_weekend:'הזמנות משישי-שבת יוצאות ביום ראשון', deliver_on:'לביצוע ב-', s_email:'אימייל להתראות על בקשות חדשות', s_days:'ימי עסקים לבדיקת בקשה', s_cur:'מטבע תשלומים (Stripe)', resync:'סנכרון רשימת היוצרים', saved:'נשמר', done:'בוצע',
+    s_commission:'עמלת פלטפורמה (%)', s_uplift:'עלות משלוח להזמנה (₪) – משולמת ע"י הלקוח בקופה, או ע"י היוצר/ת כשמוצע משלוח חינם', s_cats:'קטגוריות מוצרים (שורה לכל קטגוריה; "אחר" נוסף תמיד)', ship_free:'משלוח חינם (היוצר/ת מממן/ת)', ship_paid:'הלקוח משלם משלוח', stock:'מלאי', suggest:'הצעה לקטגוריה חדשה', cost:'עלות ליוצר/ת', s_fee:'תשלום לשליח למשלוח (₪)', s_auto:'שיבוץ אוטומטי של שליחים לפי עיר', s_cap:'סימון "אזל" כשיוצר/ת מגיע/ה לקיבולת היומית', s_weekend:'הזמנות משישי-שבת יוצאות ביום ראשון', deliver_on:'לביצוע ב-', s_email:'אימייל להתראות על בקשות חדשות', s_days:'ימי עסקים לבדיקת בקשה', s_cur:'מטבע תשלומים (Stripe)', resync:'סנכרון רשימת היוצרים', saved:'נשמר', done:'בוצע',
     no_stripe:'Stripe לא מוגדר – אפשר לסמן תשלומים ידנית.', no_email:'שליחת אימיילים לא מוגדרת (RESEND_API_KEY / NOTIFY_FROM).', portal_links:'קישורים לאזורים האישיים', areas:'אזורים', delivered:'נמסרו', fee:'תשלום למשלוח (₪, ריק = ברירת מחדל)', products:'מוצרים', earnings:'הכנסות', week:'השבוע', month:'החודש', ytd:'מתחילת השנה', all_orders:'הזמנות',
   },
   en: { overview:'Overview', nav_apps:'Applications', nav_products:'Product approval', nav_creators:'Creators', nav_orders:'Orders', nav_couriers:'Couriers & deliveries', nav_payouts:'Payouts', nav_settings:'Settings',
@@ -90,7 +106,7 @@ const T = {
     reason:'Reason (shown to the creator)', note:'Note (emailed, optional)', name:'Name', city:'City', email:'Email', phone:'Phone', live:'Live', owed:'Owed', total:'Total', capacity:'Daily capacity', commission:'Commission %', status:'Status', actions:'Actions',
     order:'Order', date:'Date', delivery:'Delivery', assigned_to:'Courier', auto:'Auto-assign', unassign:'No courier', mark_paid:'Mark as paid', stripe_pay:'Pay with Stripe', history:'Payout history', reference:'Reference (transfer / Bit no.)',
     review:'To review', suspended:'Suspended', active:'Active', suspend:'Suspend', activate:'Activate', open_store:'Store', in_shopify:'Open in Shopify', site_price:'Site price', creator_price:'Creator price', edited:'Edited after approval',
-    s_commission:'Platform commission (%)', s_uplift:'Added to every product price (₪) – funds free delivery', s_fee:'Courier pay per delivery (₪)', s_auto:'Auto-assign couriers by city', s_cap:'Mark creator products sold out at daily capacity', s_weekend:'Friday–Saturday orders go out on Sunday', deliver_on:'Deliver on ', s_email:'Email for new-application alerts', s_days:'Business days to review an application', s_cur:'Payout currency (Stripe)', resync:'Resync creator list', saved:'Saved', done:'Done',
+    s_commission:'Platform commission (%)', s_uplift:'Delivery cost per order (₪) – paid by the client at checkout, or by the creator when they offer free shipping', s_cats:'Product categories (one per line; "אחר" is always added)', ship_free:'Free shipping (creator pays)', ship_paid:'Client pays delivery', stock:'Stock', suggest:'Suggested new category', cost:'Creator cost', s_fee:'Courier pay per delivery (₪)', s_auto:'Auto-assign couriers by city', s_cap:'Mark creator products sold out at daily capacity', s_weekend:'Friday–Saturday orders go out on Sunday', deliver_on:'Deliver on ', s_email:'Email for new-application alerts', s_days:'Business days to review an application', s_cur:'Payout currency (Stripe)', resync:'Resync creator list', saved:'Saved', done:'Done',
     no_stripe:'Stripe is not configured – payouts can be marked manually.', no_email:'Email sending is not configured (RESEND_API_KEY / NOTIFY_FROM).', portal_links:'Portal links', areas:'Areas', delivered:'Delivered', fee:'Pay per delivery (₪, empty = default)', products:'Products', earnings:'Earnings', week:'This week', month:'This month', ytd:'Year to date', all_orders:'Orders',
   },
 };
@@ -172,16 +188,16 @@ const pages = {
 
   async '/applications'() {
     const q = new URLSearchParams(location.search);
-    const kind = q.get('kind') || 'creator', status = q.get('status') || 'pending';
-    const d = await api(`/applications?kind=${kind}&status=${status}`);
-    const tab = (k, v, label) => `<button aria-pressed="${q.get(k) === v || (!q.get(k) && (v === 'creator' || v === 'pending'))}" data-q="${k}=${v}">${label}</button>`;
+    const kind = q.get('kind') || 'all', status = q.get('status') || 'pending';
+    const d = await api(`/applications?kind=${kind === 'all' ? '' : kind}&status=${status}`);
+    const tab = (k, v, label) => `<button aria-pressed="${q.get(k) === v || (!q.get(k) && (v === 'all' && k === 'kind' || v === 'pending' && k === 'status'))}" data-q="${k}=${v}">${label}</button>`;
     const field = (k, v) => v && (Array.isArray(v) ? v.length : true) ? `<dt>${esc(k)}</dt><dd>${esc(Array.isArray(v) ? v.join(', ') : v)}</dd>` : '';
     app.innerHTML = head(t('nav_apps')) +
-      `<div class="tabs">${tab('kind', 'creator', t('creators'))}${tab('kind', 'courier', t('couriers'))}<span style="width:16px"></span>
+      `<div class="tabs">${tab('kind', 'all', t('all'))}${tab('kind', 'creator', t('creators'))}${tab('kind', 'courier', t('couriers'))}<span style="width:16px"></span>
         ${tab('status', 'pending', t('pending'))}${tab('status', 'approved', t('approved'))}${tab('status', 'rejected', t('rejected'))}${tab('status', 'all', t('all'))}</div>` +
       (d.applications.length ? `<div class="apps">${d.applications.map((a) => {
         const x = a.data || {};
-        return `<div class="card app"><div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(a.name)}</h2>${st(a.status)}</div>
+        return `<div class="card app"><div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(a.name)} ${B('info', a.kind === 'courier' ? t('courier') : t('creator'))}</h2>${st(a.status)}</div>
           <p class="muted">${day(a.created_at)}</p>
           <dl>${field(t('email'), a.email)}${field(t('phone'), a.phone)}${field(t('city'), a.city)}
             ${Object.entries(x).filter(([k]) => !['name', 'email', 'phone', 'city', 'kind', 'terms', 'images'].includes(k)).map(([k, v]) => field((FL[LANG] && FL[LANG][k]) || k, v)).join('')}
@@ -205,8 +221,11 @@ const pages = {
         return `<div class="card prod"><img src="${esc(p.image_url || '')}" alt="" onerror="this.style.visibility='hidden'">
           <div><div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(p.title)}</h2>${st(p.status)}</div>
           <p class="muted">${esc(p.creator_name)} · ${day(p.updated_at)} · ${esc(x.category || '')}</p>
-          <p>${t('creator_price')}: <b class="num">${amt(p.creator_price)}</b> · ${t('site_price')}: <b class="num">${amt(p.list_price)}</b></p>
-          ${x.option ? `<p class="muted">${esc(x.option.name)}: ${x.option.values.map((v) => esc(v.name) + ' ' + amt(v.price)).join(' · ')}</p>` : ''}
+          <p>${t('creator_price')}: <b class="num">${amt(p.creator_price)}</b> · ${t('site_price')}: <b class="num">${amt(p.list_price)}</b>
+            ${x.shipping ? ' · ' + B(x.shipping === 'free' ? 'ok' : '', x.shipping === 'free' ? t('ship_free') : t('ship_paid')) : ''}
+            ${x.stock != null && x.stock !== '' ? ` · ${t('stock')}: <b class="num">${esc(x.stock)}</b>` : ''}${x.cost ? ` · ${t('cost')}: <span class="num">${amt(x.cost)}</span>` : ''}</p>
+          ${x.categorySuggest ? `<p>${B('warn', t('suggest'))} <b>${esc(x.categorySuggest)}</b></p>` : ''}
+          ${x.option ? `<p class="muted">${esc(x.option.name)}: ${x.option.values.map((v) => esc(v.name) + ' ' + amt(v.price) + (v.stock != null && v.stock !== '' ? ` (${t('stock')} ${esc(v.stock)})` : '')).join(' · ')}</p>` : ''}
           ${x.description ? `<p class="muted" style="white-space:pre-line;max-height:7.5em;overflow:auto">${esc(x.description)}</p>` : ''}
           ${p.reject_reason ? `<p class="muted">${t('reason')}: ${esc(p.reject_reason)}</p>` : ''}
           <div class="row">${['pending', 'edited', 'rejected', 'hidden'].includes(p.status) ? `<button class="btn primary" data-ok="${p.id}">${t('approve')}</button>` : ''}
@@ -222,7 +241,7 @@ const pages = {
 
   async '/creators'() {
     const d = await api('/creators');
-    app.innerHTML = head(t('nav_creators')) + `<div class="card">${d.creators.length ? `<table><tr><th>${t('name')}</th><th>${t('city')}</th><th>${t('live')}</th><th>${t('pending')}</th><th>${t('capacity')}</th><th>${t('owed')}</th><th>${t('status')}</th></tr>
+    app.innerHTML = head(t('nav_creators')) + `<div class="card">${d.creators.length ? `<table class="resp"><tr><th>${t('name')}</th><th>${t('city')}</th><th>${t('live')}</th><th>${t('pending')}</th><th>${t('capacity')}</th><th>${t('owed')}</th><th>${t('status')}</th></tr>
       ${d.creators.map((c) => `<tr class="click" data-id="${c.id}"><td><b>${esc(c.name)}</b><div class="muted">${esc(c.email)}</div></td><td>${esc(c.city)}</td><td>${c.live}</td><td>${c.pending}</td>
         <td>${c.capacity_daily || '∞'}</td><td class="num">${ils(c.owed_cents)}</td><td>${c.status === 'approved' ? B('ok', t('active')) : B('bad', t('suspended'))}</td></tr>`).join('')}</table>`
       : `<div class="empty">${t('none')}</div>`}</div>`;
@@ -282,12 +301,13 @@ const pages = {
       `<form class="two" id="sf"><div class="card">${num('commission_pct', 's_commission')}${num('uplift_ils', 's_uplift')}${num('courier_fee_ils', 's_fee')}${num('review_days', 's_days')}
         <div class="field"><label for="s-mail">${t('s_email')}</label><input type="email" id="s-mail" name="notify_email" value="${esc(s.notify_email)}"></div>
         <div class="field"><label for="s-cur">${t('s_cur')}</label><input type="text" id="s-cur" name="payout_currency" value="${esc(s.payout_currency)}"></div>
+        <div class="field"><label for="s-cats">${t('s_cats')}</label><textarea id="s-cats" name="categories" rows="8">${esc(s.categories || '')}</textarea></div>
         ${chk('auto_assign_couriers', 's_auto')}${chk('enforce_capacity', 's_cap')}${chk('weekend_queue', 's_weekend')}<button class="btn primary" type="submit">${t('save')}</button></div>
         <div class="card"><h2>${t('resync')}</h2><p class="help">"Creators in your area" list on the store (metaobject mb_creator).</p><button class="btn" type="button" id="resync">${t('resync')}</button>
         <p class="help" style="margin-top:14px">App proxy: <code>https://${esc(d.env.shop)}${esc(d.env.proxy)}</code></p></div></form>`;
     document.getElementById('sf').onsubmit = (e) => {
       e.preventDefault(); const f = e.target; const body = {};
-      f.querySelectorAll('input[name]').forEach((i) => { body[i.name] = i.type === 'checkbox' ? (i.checked ? '1' : '0') : i.value; });
+      f.querySelectorAll('input[name],textarea[name]').forEach((i) => { body[i.name] = i.type === 'checkbox' ? (i.checked ? '1' : '0') : i.value; });
       act(f.querySelector('[type=submit]'), () => api('/settings', body), t('saved'));
     };
     document.getElementById('resync').onclick = (e) => act(e.target, async () => { const r = await api('/resync', {}); if (r.errors.length) toast(r.errors.join(' | '), true); return r; });

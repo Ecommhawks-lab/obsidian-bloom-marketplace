@@ -87,23 +87,36 @@
       return '<div class="mbp-opt-row"><input class="mbp-in" name="ov" placeholder="ערך, למשל: גדול" aria-label="ערך">' +
         '<input class="mbp-in" name="op" type="number" min="0" step="1" inputmode="decimal" placeholder="מחיר" aria-label="מחיר">' +
         '<input class="mbp-in" name="oc" type="number" min="0" step="1" inputmode="decimal" placeholder="לפני הנחה" aria-label="מחיר לפני הנחה">' +
+        '<input class="mbp-in" name="os" type="number" min="0" step="1" inputmode="numeric" placeholder="מלאי" aria-label="כמות במלאי">' +
         '<button type="button" class="mbp-icon-btn" data-del aria-label="מחיקת שורה">×</button></div>';
     }
     $('[data-add-row]', form).addEventListener('click', function () { rows.insertAdjacentHTML('beforeend', rowHtml()); });
     rows.addEventListener('click', function (e) { if (e.target.hasAttribute('data-del')) { e.target.closest('.mbp-opt-row').remove(); preview(); } });
     if (!rows.children.length) { rows.insertAdjacentHTML('beforeend', rowHtml()); rows.insertAdjacentHTML('beforeend', rowHtml()); }
 
+    function shipMode() { var r = $('input[name=shipping]:checked', form); return r ? r.value : 'free'; }
     function preview() {
       var prices = hasOpt.checked
         ? $all('input[name=op]', rows).map(function (i) { return Number(i.value); }).filter(function (n) { return n > 0; })
         : [Number($('[name=price]', form).value)].filter(function (n) { return n > 0; });
-      var out = $('.mbp-price-preview', form);
-      if (!prices.length) { out.textContent = 'המחיר באתר יחושב אוטומטית: המחיר שלך + ' + money(uplift) + ' (משלוח חינם ללקוח).'; return; }
-      var min = Math.min.apply(null, prices);
-      out.innerHTML = 'מחיר באתר: <b>' + money(min + uplift) + '</b> (המחיר שלך ' + money(min) + ' + ' + money(uplift) + ' משלוח). ' +
-        'את/ה מקבל/ת כ-<b>' + money(min * (1 - commission / 100)) + '</b> אחרי עמלה של ' + commission + '%.';
+      var tip = $('[data-ship-tip]', form); if (tip) tip.hidden = shipMode() !== 'paid';
+      var body = $('.mbp-profit tbody', form); if (!body) return;
+      var price = prices.length ? Math.min.apply(null, prices) : 0;
+      var cost = Number(($('[name=cost]', form) || {}).value || 0);
+      var fee = Math.round(price * commission) / 100;
+      var ship = shipMode() === 'free' ? uplift : 0;
+      var profit = price - fee - ship - cost;
+      function row(label, val, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + label + '</td><td>' + val + '</td></tr>'; }
+      body.innerHTML =
+        row('מחיר ללקוח', money(price)) +
+        row('עמלת Mercado Bloom (' + commission + '%)', '−' + money(fee)) +
+        row(ship ? 'משלוח חינם (על חשבונך)' : 'משלוח (הלקוח משלם ' + money(uplift) + ')', ship ? '−' + money(ship) : money(0)) +
+        row('עלות המוצר', cost ? '−' + money(cost) : money(0)) +
+        row('הרווח שלך להזמנה', money(profit), 'is-total' + (profit < 0 ? ' is-neg' : ''));
     }
-    form.addEventListener('input', preview); preview();
+    var catSel = $('[name=category]', form), catOther = $('[data-cat-other]', form);
+    if (catSel && catOther) catSel.addEventListener('change', function () { catOther.hidden = catSel.value !== 'אחר'; });
+    form.addEventListener('input', preview); form.addEventListener('change', preview); preview();
 
     form.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -116,12 +129,16 @@
         tags: $('[name=tags]', form).value,
         price: $('[name=price]', form).value,
         compareAt: $('[name=compareAt]', form).value,
+        stock: $('[name=stock]', form).value,
+        cost: $('[name=cost]', form).value,
+        shipping: shipMode(),
+        categorySuggest: ($('[name=categorySuggest]', form) || {}).value || '',
         option: null,
         media: mediaChanged ? media.map(function (m) { return m.url; }) : null
       };
       if (hasOpt.checked) {
         var vals = $all('.mbp-opt-row', rows).map(function (r) {
-          return { name: $('[name=ov]', r).value.trim(), price: $('[name=op]', r).value, compareAt: $('[name=oc]', r).value };
+          return { name: $('[name=ov]', r).value.trim(), price: $('[name=op]', r).value, compareAt: $('[name=oc]', r).value, stock: $('[name=os]', r).value };
         }).filter(function (v) { return v.name; });
         body.option = { name: $('[name=optName]', form).value.trim() || 'גודל', values: vals };
       }
@@ -159,6 +176,8 @@
       var logo = f.querySelector('input[type=file][data-logo]');
       var chain = Promise.resolve();
       if (logo && logo.files.length) chain = uploadFiles(logo.files).then(function (u) { data.logo_resource = u[0]; });
+      var banner = f.querySelector('input[type=file][data-banner]');
+      if (banner && banner.files.length) chain = chain.then(function () { return uploadFiles(banner.files); }).then(function (u) { data.banner_resource = u[0]; });
       busy(btn, true);
       chain.then(function () { return api(f.getAttribute('data-api'), data); })
         .then(function (j) { toast(j.message || 'נשמר'); busy(btn, false); if (j.reload) setTimeout(function () { location.reload(); }, 700); })

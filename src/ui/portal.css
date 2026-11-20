@@ -1,5 +1,7 @@
 .mbp{--bg:#F6F6F6;--card:#FFFFFF;--line:#E3E3E3;--ink:#000000;--muted:#616161;--soft:#F1F1F1;--ok:#0C5132;--okbg:#CDFEE1;--warn:#5E4200;--warnbg:#FFEB78;--bad:#8E1F0B;--badbg:#FEDAD9;
-  background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;min-height:70vh;padding:0 0 96px;direction:rtl;text-align:right}
+  background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;min-height:70vh;padding:0 0 96px;direction:rtl;text-align:right;
+  font-family:"Heebo","Assistant",-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.mbp h1,.mbp h2,.mbp h3,.mbp b,.mbp strong,.mbp button,.mbp input,.mbp select,.mbp textarea,.mbp label,.mbp a{font-family:inherit;letter-spacing:normal;text-transform:none}
 .mbp *{box-sizing:border-box}
 .mbp a{color:inherit}
 .mbp-wrap{max-width:1100px;margin:0 auto;padding:16px}
@@ -24,14 +26,26 @@
 .mbp-kpi b{display:block;font-size:22px;font-weight:700;margin-top:4px;direction:ltr;text-align:right;unicode-bidi:isolate}
 .mbp-label{display:block;font-size:13px;font-weight:600;margin:0 0 6px}
 .mbp-field{margin:0 0 14px}
-.mbp-in,.mbp select,.mbp textarea{width:100%;min-height:44px;border:1px solid #8A8A8A;border-radius:8px;padding:10px 12px;font:inherit;background:#fff;color:var(--ink)}
+/* Framed fields. Higher specificity than the theme's own input[type=…] rules (they hid the price fields). */
+.mbp .mbp-in,.mbp select,.mbp textarea{display:block;width:100%;min-height:46px;height:auto;margin:0;border:1px solid #8A8A8A !important;border-radius:10px;padding:10px 12px;
+  font:inherit;font-size:16px;background:#fff !important;color:var(--ink) !important;opacity:1;visibility:visible;box-shadow:none;-webkit-appearance:none;appearance:none}
+.mbp select{background-image:linear-gradient(45deg,transparent 50%,#303030 50%),linear-gradient(135deg,#303030 50%,transparent 50%) !important;
+  background-position:16px 50%,22px 50% !important;background-size:6px 6px !important;background-repeat:no-repeat !important;padding-left:36px}
 .mbp textarea{min-height:140px;resize:vertical}
-.mbp-in:focus,.mbp select:focus,.mbp textarea:focus{outline:2px solid var(--ink);outline-offset:1px}
+.mbp .mbp-in:focus,.mbp select:focus,.mbp textarea:focus{outline:2px solid var(--ink);outline-offset:1px}
+.mbp input[type=number]::-webkit-inner-spin-button{opacity:1}
+/* The theme sets input{appearance:none;height:100%;width:100%}: give checkboxes and radios their normal look back. */
+.mbp input[type=checkbox],.mbp input[type=radio]{-webkit-appearance:auto !important;appearance:auto !important;display:inline-block;width:20px !important;height:20px !important;min-height:0;margin:0;flex:0 0 auto;accent-color:#000;border:0;background:none}
+.mbp input[type=file]{height:auto;width:auto;display:block;font-size:14px}
+.mbp-box{border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 14px;background:#FCFCFC}
+.mbp-box > .mbp-label{margin-bottom:10px}
 .mbp-help{color:var(--muted);font-size:13px;margin:6px 0 0}
 .mbp-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.mbp-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px 18px;border-radius:10px;border:1px solid var(--ink);background:var(--ink);color:#fff;font:inherit;font-weight:700;cursor:pointer;text-decoration:none}
-.mbp-btn--ghost{background:#fff;color:var(--ink)}
-.mbp-btn--danger{background:#fff;color:var(--bad);border-color:var(--bad)}
+.mbp .mbp-btn,.mbp-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px 18px;border-radius:10px;border:1px solid var(--ink);background:var(--ink);color:#fff;font:inherit;font-weight:700;cursor:pointer;text-decoration:none}
+/* Buttons: white text on black (links used to inherit black text from ".mbp a"). */
+.mbp a.mbp-btn,.mbp button.mbp-btn{background:var(--ink);color:#fff !important;border:1px solid var(--ink);text-transform:none;letter-spacing:normal;box-shadow:none}
+.mbp a.mbp-btn--ghost,.mbp button.mbp-btn--ghost,.mbp-btn--ghost{background:#fff;color:var(--ink) !important;border-color:var(--ink)}
+.mbp a.mbp-btn--danger,.mbp button.mbp-btn--danger,.mbp-btn--danger{background:#fff;color:var(--bad) !important;border-color:var(--bad)}
 .mbp-btn[disabled]{opacity:.55;cursor:wait}
 .mbp-btn--block{width:100%}
 .mbp-icon-btn{width:44px;height:44px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:22px;cursor:pointer}
@@ -55,14 +69,19 @@
 .mbp-media__add span{font-size:28px;line-height:1}
 .mbp-media__add small{font-size:12.5px;color:var(--muted)}
 .mbp-media__add.is-busy{opacity:.5;pointer-events:none}
-.mbp-opt-row{display:grid;grid-template-columns:1.4fr 1fr 1fr 44px;gap:8px;margin:0 0 8px}
+.mbp-opt-head{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 44px;gap:8px;font-size:12.5px;color:var(--muted);margin:0 0 4px}
+.mbp-opt-row{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 44px;gap:8px;margin:0 0 8px}
+@media(max-width:600px){.mbp-opt-head{display:none}
+  .mbp-opt-row{grid-template-columns:1fr 1fr 1fr 44px;border:1px solid var(--line);border-radius:10px;padding:8px;background:#FCFCFC}
+  .mbp-opt-row > [name=ov]{grid-column:1 / -2}.mbp-opt-row > [data-del]{grid-row:1;grid-column:-2 / -1}}
+.mbp-opt-row .mbp-in::placeholder{font-size:13px}
 .mbp-check{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
 .mbp-check input{width:20px;height:20px;accent-color:#000}
 .mbp-checks{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
 .mbp-price-preview{background:var(--soft);border-radius:8px;padding:10px 12px;font-size:14px;margin-top:4px}
 .mbp-savebar{position:fixed;inset:auto 0 0 0;background:#1a1a1a;color:#fff;padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:10px;justify-content:space-between;align-items:center;z-index:50}
-.mbp-savebar .mbp-btn{background:#fff;color:#000;border-color:#fff}
-.mbp-savebar .mbp-btn--danger{background:transparent;color:#fff;border-color:#fff}
+.mbp-savebar .mbp-btn,.mbp .mbp-savebar button.mbp-btn{background:#fff;color:#000 !important;border-color:#fff}
+.mbp .mbp-savebar button.mbp-btn--danger{background:transparent;color:#fff !important;border-color:#fff}
 .mbp-empty{text-align:center;padding:28px 12px;color:var(--muted)}
 .mbp-empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
 .mbp-table{width:100%;border-collapse:collapse;font-size:14px}
@@ -82,3 +101,23 @@
 .mbp-progress{height:8px;background:var(--soft);border-radius:999px;overflow:hidden;margin-top:8px}
 .mbp-progress span{display:block;height:100%;background:#000}
 .mbp-logo{width:72px;height:72px;border-radius:50%;object-fit:cover;border:1px solid var(--line);background:var(--soft)}
+
+/* shipping choice + profit calculator */
+.mbp-radio{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;background:#fff;margin:0 0 8px}
+.mbp-radio input{width:20px;height:20px;margin-top:2px;accent-color:#000;flex:0 0 auto}
+.mbp-radio b{display:block}.mbp-radio small{color:var(--muted);font-size:13px}
+.mbp-radio:has(input:checked){border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.mbp-tip{border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.55;background:rgba(0,128,96,.08);border:1px solid rgba(0,128,96,.25);color:#0B4A3A;margin:6px 0 0}
+.mbp-tip[hidden]{display:none}
+.mbp-profit{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}
+.mbp-profit td{padding:7px 4px;border-top:1px solid var(--line)}
+.mbp-profit td:last-child{text-align:left;direction:ltr;unicode-bidi:isolate;white-space:nowrap}
+.mbp-profit tr.is-total td{font-weight:700;font-size:15.5px;border-top:2px solid var(--ink)}
+.mbp-profit tr.is-neg td:last-child{color:var(--bad)}
+/* creator store card preview (4:3 cover, logo + name like the store) */
+.mbp-store{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#fff;max-width:420px}
+.mbp-store__cover{aspect-ratio:4/3;background:var(--soft) center/cover no-repeat;position:relative}
+.mbp-store__promo{position:absolute;bottom:10px;right:10px;background:#000;color:#fff;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700}
+.mbp-store__row{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.mbp-store__row img{width:44px;height:44px;border-radius:10px;object-fit:cover;border:1px solid var(--line);background:#fff}
+.mbp-store__row b{flex:1 1 auto}
