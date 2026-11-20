@@ -24,6 +24,42 @@ export async function notify(env, to, subject, html) {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const storeUrl = (env) => `https://${env.SHOP}`;
 
+/* ------------------------------ notification emails ------------------------------ */
+// Israeli numbers (05x...) -> international digits for wa.me links.
+const waDigits = (p) => { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('0')) d = '972' + d.slice(1); return d; };
+const shipLine = (a) => { try { a = typeof a === 'string' ? JSON.parse(a || '{}') : (a || {}); } catch { a = {}; } return [a.address1, a.address2, a.city].filter(Boolean).join(', '); };
+const btn = (href, label) => `<a href="${href}" style="display:inline-block;margin:4px 0 4px 8px;padding:10px 16px;border-radius:999px;background:#000;color:#fff;text-decoration:none;font-weight:700">${label}</a>`;
+const wrap = (inner) => `<div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#111">${inner}<p style="color:#777;font-size:13px;margin-top:24px">Mercado Bloom</p></div>`;
+async function notifyCreatorOrder(env, creator, order, lines, deliverOn) {
+  if (!creator?.email) return;
+  const items = lines.map((l) => `<li>${esc(l.qty)} × ${esc(l.title)}${l.variant && l.variant !== 'Default Title' ? ' (' + esc(l.variant) + ')' : ''}</li>`).join('');
+  await notify(env, creator.email, `הזמנה חדשה ${order.name || ''} – יש להכין`, wrap(
+    `<p>שלום ${esc(creator.name)}, התקבלה הזמנה חדשה עבורך.</p>
+     <p><strong>הזמנה:</strong> ${esc(order.name || '')}<br><strong>להכנה עד:</strong> ${esc(deliverOn || 'היום')}</p>
+     <ul>${items}</ul>
+     <p>שליח/ה יגיע/תגיע לאסוף מהכתובת שבפרופיל שלך. הפרטים המלאים באזור היוצרים:</p>
+     ${btn(`${storeUrl(env)}${env.PROXY_PREFIX || '/apps/mb'}/creator`, 'לאזור היוצרים')}`));
+}
+async function notifyCourierDelivery(env, db, courier, d) {
+  if (!courier?.email || !d) return;
+  const addr = shipLine(d.address);
+  let pick = [];
+  try {
+    const o = await db.get('SELECT creator_ids FROM mb_orders WHERE order_id = ?', [d.order_id]);
+    const ids = JSON.parse(o?.creator_ids || '[]');
+    for (const id of ids) { const c = await db.get('SELECT name, city, phone FROM mb_creators WHERE id = ?', [id]); if (c) pick.push(c); }
+  } catch (e) { console.error('pickup', e); }
+  const pickHtml = pick.map((c) => `<li>${esc(c.name)}${c.city ? ' – ' + esc(c.city) : ''}${c.phone ? ' · <a href="tel:' + esc(c.phone) + '">' + esc(c.phone) + '</a>' : ''}</li>`).join('');
+  const wa = waDigits(d.phone);
+  await notify(env, courier.email, `משלוח חדש: ${d.order_name} (${d.city})`, wrap(
+    `<p>שלום ${esc(courier.name)}, שובץ לך משלוח חדש.</p>
+     <p><strong>הזמנה:</strong> ${esc(d.order_name)}<br><strong>יום מסירה:</strong> ${esc(d.deliver_on || 'היום')}<br>
+     <strong>לקוח/ה:</strong> ${esc(d.customer_name)}${d.phone ? ' · <a href="tel:' + esc(d.phone) + '">' + esc(d.phone) + '</a>' : ''}<br>
+     <strong>כתובת:</strong> ${esc(addr)}${d.note ? '<br><strong>הערה:</strong> ' + esc(d.note) : ''}</p>
+     ${pickHtml ? '<p><strong>איסוף מ:</strong></p><ul>' + pickHtml + '</ul>' : ''}
+     <p>${addr ? btn('https://waze.com/ul?navigate=yes&q=' + encodeURIComponent(addr), 'ניווט ב-Waze') : ''}${wa ? btn('https://wa.me/' + wa, 'וואטסאפ ללקוח/ה') : ''}${btn(`${storeUrl(env)}${env.PROXY_PREFIX || '/apps/mb'}/courier`, 'לאזור השליחים')}</p>`));
+}
+
 /* ------------------------------ applications ------------------------------ */
 export async function submitApplication(env, kind, body) {
   const db = makeDb(env);
@@ -236,7 +272,21 @@ export async function processOrder(env, order) {
       [orderId, order.name || '', city, JSON.stringify(ship), customerName, ship.phone || order.phone || '', order.note || '', fee,
        deliveryDay(order.created_at ? new Date(order.created_at) : new Date(), s.weekend_queue !== '0')]
     );
-    if (r.changes && s.auto_assign_couriers === '1') await autoAssign(env, orderId);
+    if (r.changes) {
+      const assigned = s.auto_assign_couriers === '1' ? await autoAssign(env, orderId) : null;
+      if (!assigned) {
+        await notify(env, s.notify_email, `משלוח בלי שליח: ${order.name || ''} (${city || 'ללא עיר'})`, wrap(
+          `<p>להזמנה ${esc(order.name || '')} לא נמצא/ה שליח/ה שמכסה את ${esc(city || 'העיר')}. יש לשבץ ידנית באפליקציה: Couriers &amp; deliveries.</p>`));
+      }
+    }
+  }
+  // Tell each creator what to prepare (best effort: an email problem never blocks the order).
+  const deliverOn = deliveryDay(order.created_at ? new Date(order.created_at) : new Date(), s.weekend_queue !== '0');
+  for (const cid of Object.keys(perCreator)) {
+    try {
+      const creator = await db.get('SELECT id, name, email FROM mb_creators WHERE id = ?', [cid]);
+      await notifyCreatorOrder(env, creator, order, lines.filter((l) => String(l.creator_id) === String(cid)), deliverOn);
+    } catch (e) { console.error('notify creator', e); }
   }
   return { creators: Object.keys(perCreator).length };
 }
@@ -275,8 +325,7 @@ export async function assignDelivery(env, deliveryId, courierId) {
   );
   if (c) {
     const d = await db.get('SELECT * FROM mb_deliveries WHERE id = ?', [deliveryId]);
-    await notify(env, c.email, `משלוח חדש: ${d.order_name} (${d.city})`,
-      `<p dir="rtl">שובץ לך משלוח חדש. לפרטים: ${storeUrl(env)}${env.PROXY_PREFIX || '/apps/mb'}/courier</p>`);
+    try { await notifyCourierDelivery(env, db, c, d); } catch (e) { console.error('notify courier', e); }
   }
 }
 export async function setDeliveryStatus(env, deliveryId, status, courierId = null) {
