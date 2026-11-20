@@ -6,7 +6,7 @@ application_url = "https://obsidian-bloom-marketplace.mercado-bloom.workers.dev"
 embedded = true
 
 [access_scopes]
-scopes = "read_products,write_products,read_customers,write_customers,read_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,read_metaobjects,write_metaobjects,read_metaobject_definitions,write_files,read_files,read_publications,write_publications,write_app_proxy"
+scopes = "read_products,write_products,read_customers,write_customers,read_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,read_shipping,write_shipping,read_metaobjects,write_metaobjects,read_metaobject_definitions,write_files,read_files,read_publications,write_publications,write_app_proxy"
 
 [auth]
 redirect_urls = ["https://obsidian-bloom-marketplace.mercado-bloom.workers.dev/auth/callback"]
