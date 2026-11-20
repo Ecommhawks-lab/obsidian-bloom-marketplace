@@ -36,7 +36,8 @@
 .mbp input[type=number]::-webkit-inner-spin-button{opacity:1}
 /* The theme sets input{appearance:none;height:100%;width:100%}: give checkboxes and radios their normal look back. */
 .mbp input[type=checkbox],.mbp input[type=radio]{-webkit-appearance:auto !important;appearance:auto !important;display:inline-block;width:20px !important;height:20px !important;min-height:0;margin:0;flex:0 0 auto;accent-color:#000;border:0;background:none}
-.mbp input[type=file]{height:auto;width:auto;display:block;font-size:14px}
+.mbp input[type=file]:not([hidden]){height:auto;width:auto;display:block;font-size:14px}
+.mbp [hidden]{display:none !important}
 .mbp-box{border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 14px;background:#FCFCFC}
 .mbp-box > .mbp-label{margin-bottom:10px}
 .mbp-help{color:var(--muted);font-size:13px;margin:6px 0 0}
