@@ -2,7 +2,7 @@
 // Every request is signed by Shopify; the logged-in customer id comes from that signature,
 // so access to the creator / courier areas is enforced here, on the server.
 import { Hono } from 'hono';
-import { makeDb } from '../db.mjs';
+import { makeDb, categoryList } from '../db.mjs';
 import { verifyProxy, makeAdmin } from '../shopify.mjs';
 import { makeStripe } from '../stripe.mjs';
 import {
@@ -130,7 +130,7 @@ async function editorPage(c, id) {
     try { media = product.shopify_gid ? await makeAdmin(c.env).productMedia(product.shopify_gid) : []; } catch (e) { console.error(e); }
   }
   const commission = cr.commission_pct != null ? cr.commission_pct : Number(settings.commission_pct);
-  return liquid(c, V.productEditor(ctxOf(c, { commission }), { product, media, settings }));
+  return liquid(c, V.productEditor(ctxOf(c, { commission }), { product, media, settings, categories: categoryList(settings) }));
 }
 proxy.get('/creator/products/new', (c) => editorPage(c, null));
 proxy.get('/creator/products/:id', (c) => editorPage(c, Number(c.req.param('id'))));
@@ -149,14 +149,15 @@ proxy.get('/creator/profile', async (c) => {
 });
 
 /* ------------------------------ creator API ------------------------------ */
-function parseProduct(b, uplift) {
+function parseProduct(b, uplift, categories) {
   const title = String(b.title || '').trim().slice(0, 120);
   if (!title) throw new Error('יש למלא שם מוצר');
   const n = (v) => Math.max(0, Math.round(Number(v) || 0));
+  const stockOf = (v) => (v === null || v === undefined || String(v).trim() === '' ? null : n(v)); // empty = not limited
   let option = null, price = n(b.price), compareAt = n(b.compareAt) || null;
   if (b.option && Array.isArray(b.option.values) && b.option.values.length) {
     const seen = new Set();
-    const values = b.option.values.map((v) => ({ name: String(v.name || '').trim().slice(0, 60), price: n(v.price), compareAt: n(v.compareAt) || null }))
+    const values = b.option.values.map((v) => ({ name: String(v.name || '').trim().slice(0, 60), price: n(v.price), compareAt: n(v.compareAt) || null, stock: stockOf(v.stock) }))
       .filter((v) => v.name && !seen.has(v.name) && seen.add(v.name));
     if (!values.length) throw new Error('יש להוסיף לפחות ערך אחד לאפשרות');
     if (values.some((v) => !v.price)) throw new Error('לכל ערך צריך מחיר');
@@ -164,46 +165,58 @@ function parseProduct(b, uplift) {
     price = Math.min(...values.map((v) => v.price));
   } else if (!price) throw new Error('יש למלא מחיר');
   const tags = String(b.tags || '').split(',').map((t) => t.trim()).filter(Boolean).slice(0, 15);
-  const category = V.CATEGORIES.includes(b.category) ? b.category : 'אחר';
+  const category = categories.includes(b.category) ? b.category : 'אחר';
+  const suggest = category === 'אחר' ? String(b.categorySuggest || '').trim().slice(0, 40) : '';
   const description = String(b.description || '').slice(0, 5000);
-  return { title, option, price, compareAt, tags, category, description, uplift };
+  const shipping = b.shipping === 'paid' ? 'paid' : 'free';
+  const cost = b.cost === '' || b.cost == null ? null : n(b.cost);
+  return { title, option, price, compareAt, tags, category, suggest, description, uplift, shipping, cost, stock: option ? null : stockOf(b.stock) };
 }
 const toHtml = (t) => t.split(/\n{2,}/).map((p) => `<p>${V.esc(p).replace(/\n/g, '<br>')}</p>`).join('');
 
 async function saveProduct(c, cr, id, b) {
   const db = makeDb(c.env);
   const s = await db.settings();
-  const uplift = Math.max(0, Number(s.uplift_ils) || 0);
+  const delivery = Math.max(0, Number(s.uplift_ils) || 0); // delivery cost (₪) per order
   const existing = id ? await db.get('SELECT * FROM mb_products WHERE id = ? AND creator_id = ?', [id, cr.id]) : null;
   if (id && !existing) throw new Error('המוצר לא נמצא');
-  const p = parseProduct(b, existing ? Number(existing.uplift ?? uplift) : uplift);
+  const p = parseProduct(b, delivery, categoryList(s));
+  // Site price = the creator's price. Free shipping: delivery is paid from the creator's share (uplift = cost).
+  // Client pays: delivery is charged at checkout through the paid delivery profile (uplift = 0).
+  p.uplift = p.shipping === 'free' ? delivery : 0;
   const live = existing && ['approved', 'edited'].includes(existing.status);
   const media = Array.isArray(b.media) ? b.media.filter((u) => /^https:\/\//.test(u)).slice(0, 10) : null;
   if (!existing && (!media || !media.length)) throw new Error('יש להוסיף לפחות תמונה אחת');
-  const add = (v) => v + p.uplift;
+  const add = (v) => v;
   const result = await makeAdmin(c.env).saveProduct({
     gid: existing?.shopify_gid || null,
     title: p.title, descriptionHtml: toHtml(p.description), vendor: cr.vendor, productType: p.category,
-    tags: ['mercado-bloom', `creator:${cr.id}`, p.category, ...p.tags],
+    tags: ['mercado-bloom', `creator:${cr.id}`, p.category, ...(p.shipping === 'free' ? ['משלוח-חינם'] : ['משלוח-בתשלום']), ...p.tags],
     status: live ? 'ACTIVE' : 'DRAFT',
     price: add(p.price), compareAt: p.compareAt ? add(p.compareAt) : null,
-    option: p.option ? { name: p.option.name, values: p.option.values.map((v) => ({ name: v.name, price: add(v.price), compareAt: v.compareAt ? add(v.compareAt) : null })) } : null,
-    files: media, quantity: await remainingToday(db, cr),
+    option: p.option ? { name: p.option.name, values: p.option.values.map((v) => ({ name: v.name, price: add(v.price), compareAt: v.compareAt ? add(v.compareAt) : null, stock: v.stock })) } : null,
+    stock: p.stock,
+    files: media, quantity: s.enforce_capacity === '1' ? await remainingToday(db, cr) : 9999,
     metafields: [
       { namespace: 'custom', key: 'creator_id', type: 'single_line_text_field', value: String(cr.id) },
       { namespace: 'custom', key: 'creator_price', type: 'number_decimal', value: String(p.price) },
     ],
   });
+  let warning = '';
+  try { await makeAdmin(c.env).setDeliveryMode(result.variantIds, p.shipping === 'paid', delivery); }
+  catch (e) { console.error('delivery profile', e); warning = ' (הגדרת המשלוח תושלם על ידינו)'; }
   const status = live ? 'edited' : 'pending';
-  const data = JSON.stringify({ description: p.description, category: p.category, tags: p.tags, price: p.price, compareAt: p.compareAt, option: p.option });
+  const data = JSON.stringify({ description: p.description, category: p.category, categorySuggest: p.suggest, tags: p.tags, price: p.price,
+    compareAt: p.compareAt, option: p.option, stock: p.stock, shipping: p.shipping, cost: p.cost });
   if (existing) {
     await db.run(`UPDATE mb_products SET title=?, data=?, creator_price=?, list_price=?, image_url=COALESCE(?, image_url), handle=?, status=?, reject_reason=NULL, updated_at=datetime('now') WHERE id=?`,
       [p.title, data, p.price, add(p.price), result.image, result.handle, status, existing.id]);
+    await db.run('UPDATE mb_products SET uplift = ? WHERE id = ?', [p.uplift, existing.id]);
   } else {
     await db.run(`INSERT INTO mb_products (creator_id, shopify_product_id, shopify_gid, handle, title, data, creator_price, list_price, uplift, image_url, status)
       VALUES (?,?,?,?,?,?,?,?,?,?,?)`, [cr.id, result.id, result.gid, result.handle, p.title, data, p.price, add(p.price), p.uplift, result.image || (media && media[0]) || null, status]);
   }
-  return live ? 'השינויים נשמרו ומופיעים באתר' : 'המוצר נשמר ונשלח לאישור';
+  return (live ? 'השינויים נשמרו ומופיעים באתר' : 'המוצר נשמר ונשלח לאישור') + warning;
 }
 proxy.post('/api/creator/products', async (c) => {
   const cr = await apiGate(c, 'creator'); if (!cr) return c.res;
@@ -239,9 +252,19 @@ proxy.post('/api/creator/profile', async (c) => {
         logoUrl = (await admin.fileUrl(f.id).catch(() => null)) || logoUrl;
       }
     }
+    let bannerUrl = cr.banner_url, bannerFile = cr.banner_file_id;
+    if (b.banner_resource && /^https:\/\//.test(b.banner_resource)) {
+      const f = await admin.createFile(b.banner_resource, cr.name);
+      bannerFile = f.id; bannerUrl = f.image?.url || bannerUrl;
+      if (!f.image?.url) {
+        await new Promise((r) => setTimeout(r, 1500));
+        bannerUrl = (await admin.fileUrl(f.id).catch(() => null)) || bannerUrl;
+      }
+    }
     const capacity = Math.max(0, Math.min(500, parseInt(b.capacity_daily, 10) || 0));
-    await db.run(`UPDATE mb_creators SET city=?, bio=?, instagram=?, capacity_daily=?, logo_url=?, logo_file_id=? WHERE id=?`,
-      [String(b.city || cr.city || '').slice(0, 60), String(b.bio || '').slice(0, 600), String(b.instagram || '').slice(0, 200), capacity, logoUrl, logoFile, cr.id]);
+    await db.run(`UPDATE mb_creators SET city=?, bio=?, instagram=?, capacity_daily=?, logo_url=?, logo_file_id=?, banner_url=?, banner_file_id=?, promo=? WHERE id=?`,
+      [String(b.city || cr.city || '').slice(0, 60), String(b.bio || '').slice(0, 600), String(b.instagram || '').slice(0, 200), capacity, logoUrl, logoFile,
+       bannerUrl, bannerFile, String(b.promo || '').slice(0, 60), cr.id]);
     const fresh = await db.get('SELECT * FROM mb_creators WHERE id = ?', [cr.id]);
     try { await admin.upsertCreatorEntry(fresh, true); } catch (e) { console.error(e); }
     if (capacity !== cr.capacity_daily) await applyCapacity(c.env, cr.id).catch((e) => console.error(e));
