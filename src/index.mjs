@@ -11,7 +11,7 @@ import { ensureSchema, makeDb } from './db.mjs';
 import { verifyWebhook, getAccessToken, makeAdmin } from './shopify.mjs';
 import { processOrder, dailyReset } from './logic.mjs';
 import adminApi from './routes/admin.mjs';
-import proxy from './routes/proxy.mjs';
+import proxy, { migratePaidShipping } from './routes/proxy.mjs';
 import { ADMIN_HTML } from './ui/generated.mjs';
 
 const app = new Hono();
@@ -83,6 +83,9 @@ export default {
       try { await getAccessToken(env); } catch (e) { console.error('token', e.message); return; }
       if (env.APP_URL) { try { await makeAdmin(env).registerWebhooks(env.APP_URL); } catch (e) { console.error('webhooks', e.message); } }
       try { await dailyReset(env); } catch (e) { console.error('reset', e); }
+      try { await migratePaidShipping(env); } catch (e) { console.error('paid shipping', e); }
+      // Documents uploaded but never attached to an application (form abandoned) are removed after 2 days.
+      try { await makeDb(env).run(`DELETE FROM mb_documents WHERE application_id IS NULL AND created_at < datetime('now','-2 days')`); } catch (e) { console.error('docs cleanup', e); }
     })());
   },
 };

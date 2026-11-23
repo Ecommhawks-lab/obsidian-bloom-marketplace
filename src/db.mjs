@@ -60,6 +60,15 @@ export const DEFAULT_SETTINGS = {
   notify_email: '',            // where new applications are announced (needs RESEND_API_KEY)
   review_days: '5',
   weekend_queue: '1',          // Fri/Sat orders are delivered on Sunday (Israeli work week)
+  // Product category -> vehicle the courier must come with. One rule per line: "עציצים: רכב".
+  // Vehicles from small to large: אופניים < קטנוע < רכב. A courier with a larger vehicle can take a smaller job.
+  vehicle_rules: '',
+  // WhatsApp order notifications (Meta WhatsApp Cloud API). Needs WHATSAPP_TOKEN + WHATSAPP_PHONE_ID secrets
+  // and approved message templates. Only new-order messages are sent, to keep the bill low.
+  whatsapp_enabled: '0',
+  wa_template_creator: 'mb_new_order',
+  wa_template_courier: 'mb_new_delivery',
+  wa_lang: 'he',
 };
 
 let initialized = false;
@@ -157,6 +166,17 @@ export async function ensureSchema(env) {
   `);
   // Added after first release: planned delivery day (Fri/Sat orders move to Sunday).
   try { await client.execute('ALTER TABLE mb_deliveries ADD COLUMN deliver_on TEXT'); } catch { /* already there */ }
+  // Round 3: vehicle the order needs, courier ID number, private documents uploaded with applications.
+  try { await client.execute('ALTER TABLE mb_deliveries ADD COLUMN required_vehicle TEXT'); } catch { /* already there */ }
+  try { await client.execute('ALTER TABLE mb_couriers ADD COLUMN id_number TEXT'); } catch { /* already there */ }
+  await client.execute(`CREATE TABLE IF NOT EXISTS mb_documents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token TEXT UNIQUE NOT NULL,         -- handed to the browser while the form is being filled
+      doc_type TEXT NOT NULL,             -- business_doc | id_image | license_front | license_back
+      name TEXT, mime TEXT, size INTEGER,
+      data TEXT NOT NULL,                 -- base64; private (never on a public URL), shown only in the admin app
+      application_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   // Creator store card (Wolt-style): 4:3 cover / promo image and a short promo line.
   for (const col of ['banner_url TEXT', 'banner_file_id TEXT', 'promo TEXT']) {
     try { await client.execute('ALTER TABLE mb_creators ADD COLUMN ' + col); } catch { /* already there */ }

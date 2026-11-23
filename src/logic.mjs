@@ -24,15 +24,64 @@ export async function notify(env, to, subject, html) {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const storeUrl = (env) => `https://${env.SHOP}`;
 
+/* ------------------------------ vehicles ------------------------------ */
+// From small to large. A courier with a larger vehicle can take a job that needs a smaller one.
+export const VEHICLES = ['אופניים', 'קטנוע', 'רכב'];
+const vRank = (v) => VEHICLES.indexOf(String(v || '').trim()) + 1; // 0 = unknown
+export function vehicleList(raw) {
+  if (Array.isArray(raw)) return raw.map(String).map((x) => x.trim()).filter((x) => VEHICLES.includes(x));
+  return String(raw || '').split(/[,،\n]/).map((x) => x.trim()).filter((x) => VEHICLES.includes(x));
+}
+// Settings "vehicle_rules": one "category: vehicle" per line. Returns the largest vehicle needed by the categories.
+export function requiredVehicle(settings, categories = []) {
+  const rules = {};
+  for (const line of String(settings?.vehicle_rules || '').split('\n')) {
+    const m = line.split(/[:=]/);
+    if (m.length < 2) continue;
+    const cat = m[0].trim(), veh = m.slice(1).join(':').trim();
+    if (cat && vRank(veh)) rules[cat] = veh;
+  }
+  let need = '';
+  for (const cat of categories) { const v = rules[String(cat || '').trim()]; if (v && vRank(v) > vRank(need)) need = v; }
+  return need;
+}
+export function canCarry(courier, need) {
+  if (!need) return true;
+  const best = Math.max(0, ...vehicleList(courier?.vehicle).map(vRank));
+  return best >= vRank(need);
+}
+
+/* ------------------------------ WhatsApp (Meta Cloud API, optional) ------------------------------ */
+// Template messages only (business-initiated). Order notifications only, to keep costs low.
+export const waReady = (env) => !!(env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_ID);
+export async function sendWhatsApp(env, to, template, lang, params = []) {
+  const digits = waDigits(to);
+  if (!waReady(env) || !digits || !template) return false;
+  const body = { messaging_product: 'whatsapp', to: digits, type: 'template',
+    template: { name: template, language: { code: lang || 'he' } } };
+  if (params.length) body.template.components = [{ type: 'body', parameters: params.map((t) => ({ type: 'text', text: String(t ?? '').replace(/\s+/g, ' ').slice(0, 900) || '-' })) }];
+  try {
+    const r = await fetch(`https://graph.facebook.com/v21.0/${env.WHATSAPP_PHONE_ID}/messages`, {
+      method: 'POST', headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) { console.error('whatsapp', r.status, (await r.text()).slice(0, 300)); return false; }
+    return true;
+  } catch (e) { console.error('whatsapp', e); return false; }
+}
+
 /* ------------------------------ notification emails ------------------------------ */
 // Israeli numbers (05x...) -> international digits for wa.me links.
 const waDigits = (p) => { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('0')) d = '972' + d.slice(1); return d; };
 const shipLine = (a) => { try { a = typeof a === 'string' ? JSON.parse(a || '{}') : (a || {}); } catch { a = {}; } return [a.address1, a.address2, a.city].filter(Boolean).join(', '); };
 const btn = (href, label) => `<a href="${href}" style="display:inline-block;margin:4px 0 4px 8px;padding:10px 16px;border-radius:999px;background:#000;color:#fff;text-decoration:none;font-weight:700">${label}</a>`;
 const wrap = (inner) => `<div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#111">${inner}<p style="color:#777;font-size:13px;margin-top:24px">Mercado Bloom</p></div>`;
-async function notifyCreatorOrder(env, creator, order, lines, deliverOn) {
-  if (!creator?.email) return;
+async function notifyCreatorOrder(env, creator, order, lines, deliverOn, settings) {
+  if (!creator?.email && !creator?.phone) return;
   const items = lines.map((l) => `<li>${esc(l.qty)} × ${esc(l.title)}${l.variant && l.variant !== 'Default Title' ? ' (' + esc(l.variant) + ')' : ''}</li>`).join('');
+  const s = settings || {};
+  if (s.whatsapp_enabled === '1' && creator.phone) {
+    await sendWhatsApp(env, creator.phone, s.wa_template_creator, s.wa_lang, [creator.name, order.name || '',
+      lines.map((l) => `${l.qty} × ${l.title}${l.variant && l.variant !== 'Default Title' ? ' (' + l.variant + ')' : ''}`).join(', '), deliverOn || 'היום']);
+  }
   await notify(env, creator.email, `הזמנה חדשה ${order.name || ''} – יש להכין`, wrap(
     `<p>שלום ${esc(creator.name)}, התקבלה הזמנה חדשה עבורך.</p>
      <p><strong>הזמנה:</strong> ${esc(order.name || '')}<br><strong>להכנה עד:</strong> ${esc(deliverOn || 'היום')}</p>
@@ -41,8 +90,16 @@ async function notifyCreatorOrder(env, creator, order, lines, deliverOn) {
      ${btn(`${storeUrl(env)}${env.PROXY_PREFIX || '/apps/mb'}/creator`, 'לאזור היוצרים')}`));
 }
 async function notifyCourierDelivery(env, db, courier, d) {
-  if (!courier?.email || !d) return;
+  if (!d || (!courier?.email && !courier?.phone)) return;
   const addr = shipLine(d.address);
+  const need = d.required_vehicle || '';
+  try {
+    const s = await db.settings();
+    if (s.whatsapp_enabled === '1' && courier.phone) {
+      await sendWhatsApp(env, courier.phone, s.wa_template_courier, s.wa_lang, [courier.name, d.order_name || '',
+        [d.city, addr].filter(Boolean).join(' – '), need || 'כל כלי רכב', d.deliver_on || 'היום']);
+    }
+  } catch (e) { console.error('wa courier', e); }
   let pick = [];
   try {
     const o = await db.get('SELECT creator_ids FROM mb_orders WHERE order_id = ?', [d.order_id]);
@@ -56,40 +113,84 @@ async function notifyCourierDelivery(env, db, courier, d) {
      <p><strong>הזמנה:</strong> ${esc(d.order_name)}<br><strong>יום מסירה:</strong> ${esc(d.deliver_on || 'היום')}<br>
      <strong>לקוח/ה:</strong> ${esc(d.customer_name)}${d.phone ? ' · <a href="tel:' + esc(d.phone) + '">' + esc(d.phone) + '</a>' : ''}<br>
      <strong>כתובת:</strong> ${esc(addr)}${d.note ? '<br><strong>הערה:</strong> ' + esc(d.note) : ''}</p>
+     ${need ? `<p style="padding:10px 14px;border:2px solid #000;border-radius:10px"><strong>חובה להגיע עם: ${esc(need)}</strong> (לפי סוג המוצרים בהזמנה)</p>` : ''}
      ${pickHtml ? '<p><strong>איסוף מ:</strong></p><ul>' + pickHtml + '</ul>' : ''}
      <p>${addr ? btn('https://waze.com/ul?navigate=yes&q=' + encodeURIComponent(addr), 'ניווט ב-Waze') : ''}${wa ? btn('https://wa.me/' + wa, 'וואטסאפ ללקוח/ה') : ''}${btn(`${storeUrl(env)}${env.PROXY_PREFIX || '/apps/mb'}/courier`, 'לאזור השליחים')}</p>`));
 }
 
 /* ------------------------------ applications ------------------------------ */
-export async function submitApplication(env, kind, body) {
+// Israeli ID (teudat zehut): 9 digits with a Luhn-style check digit.
+export function validIsraeliId(v) {
+  const d = String(v || '').replace(/\D/g, '');
+  if (!d || d.length > 9) return false;
+  const s = d.padStart(9, '0');
+  let sum = 0;
+  for (let i = 0; i < 9; i++) { let n = Number(s[i]) * ((i % 2) + 1); if (n > 9) n -= 9; sum += n; }
+  return sum % 10 === 0 && Number(s) > 0;
+}
+// Documents each application must include (tokens from /api/apply-doc).
+export const DOC_LABELS = { business_doc: 'תעודת עוסק / רישום עסק', id_image: 'צילום תעודת זהות', license_front: 'רישיון נהיגה – צד קדמי', license_back: 'רישיון נהיגה – צד אחורי' };
+function requiredDocs(kind, body) {
+  if (kind === 'creator') return ['business_doc'];
+  const hasLicense = String(body.license || '').trim() && String(body.license).trim() !== 'לא';
+  return ['id_image', ...(hasLicense ? ['license_front', 'license_back'] : []), 'business_doc'];
+}
+
+export async function submitApplication(env, kind, body, ctx = null) {
   const db = makeDb(env);
   const email = String(body.email || '').trim().toLowerCase();
   if (!['creator', 'courier'].includes(kind)) throw new Error('Unknown application type.');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('כתובת אימייל לא תקינה');
   if (!String(body.name || '').trim()) throw new Error('יש למלא שם מלא');
   if (!body.terms) throw new Error('יש לאשר את התנאים');
+  if (kind === 'courier') {
+    if (!validIsraeliId(body.id_number)) throw new Error('מספר תעודת זהות לא תקין');
+    body.id_number = String(body.id_number).replace(/\D/g, '').padStart(9, '0');
+    const vehicles = vehicleList(body.vehicles || body.vehicle);
+    if (!vehicles.length) throw new Error('יש לבחור לפחות כלי רכב אחד');
+    body.vehicles = vehicles; body.vehicle = vehicles.join(', ');
+  }
+  // Private documents: every required one must be uploaded and not yet used by another application.
+  const docs = body.documents && typeof body.documents === 'object' ? body.documents : {};
+  const docIds = {};
+  for (const t of requiredDocs(kind, body)) {
+    const tok = String(docs[t] || '');
+    const row = tok && await db.get('SELECT id, doc_type, application_id FROM mb_documents WHERE token = ?', [tok]);
+    if (!row || row.doc_type !== t || row.application_id) throw new Error('חסר מסמך: ' + DOC_LABELS[t]);
+    docIds[t] = row.id;
+  }
   const table = kind === 'creator' ? 'mb_creators' : 'mb_couriers';
   const already = await db.get(`SELECT status FROM ${table} WHERE email = ?`, [email]);
   if (already) throw new Error('כבר קיים חשבון עם האימייל הזה');
   const open = await db.get(`SELECT id FROM mb_applications WHERE kind = ? AND email = ? AND status = 'pending'`, [kind, email]);
-  const data = { ...body }; delete data.images; delete data.terms;
+  const data = { ...body }; delete data.images; delete data.terms; delete data.documents;
   const images = Array.isArray(body.images) ? body.images.slice(0, 6) : [];
+  let appId;
   if (open) {
     await db.run(`UPDATE mb_applications SET name=?, phone=?, city=?, data=?, images=? WHERE id=?`,
       [body.name, body.phone || '', body.city || '', JSON.stringify(data), JSON.stringify(images), open.id]);
+    appId = open.id;
   } else {
-    await db.run(`INSERT INTO mb_applications (kind, email, name, phone, city, data, images) VALUES (?,?,?,?,?,?,?)`,
+    const r = await db.run(`INSERT INTO mb_applications (kind, email, name, phone, city, data, images) VALUES (?,?,?,?,?,?,?)`,
       [kind, email, body.name, body.phone || '', body.city || '', JSON.stringify(data), JSON.stringify(images)]);
+    appId = r.lastInsertRowid;
   }
-  // Mirror in Shopify Customers so the client sees the applicant with a pending tag.
-  try {
-    const cid = await makeAdmin(env).tagCustomer({ email, name: body.name, phone: body.phone }, [TAGS[kind].pending]);
-    await db.run(`UPDATE mb_applications SET customer_id = ? WHERE kind = ? AND email = ? AND status = 'pending'`, [cid, kind, email]);
-  } catch (e) { console.error('tag pending', e); }
-  const s = await db.settings();
-  await notify(env, s.notify_email, `בקשת הצטרפות חדשה (${kind === 'creator' ? 'יוצר/ת' : 'שליח/ה'}): ${body.name}`,
-    `<p dir="rtl">${esc(body.name)} (${esc(email)}) שלח/ה בקשה. לאישור: אפליקציית Mercado Bloom באדמין של Shopify.</p>`);
-  return { ok: true };
+  for (const id of Object.values(docIds)) await db.run('UPDATE mb_documents SET application_id = ? WHERE id = ?', [appId, id]);
+  // The application is saved. The rest (Shopify customer tag, email) runs after the response,
+  // so a slow Shopify call or a closed browser tab can never lose the application.
+  const after = (async () => {
+    try {
+      const cid = await makeAdmin(env).tagCustomer({ email, name: body.name, phone: body.phone }, [TAGS[kind].pending]);
+      await db.run(`UPDATE mb_applications SET customer_id = ? WHERE id = ?`, [cid, appId]);
+    } catch (e) { console.error('tag pending', e); }
+    try {
+      const s = await db.settings();
+      await notify(env, s.notify_email, `בקשת הצטרפות חדשה (${kind === 'creator' ? 'יוצר/ת' : 'שליח/ה'}): ${body.name}`,
+        `<p dir="rtl">${esc(body.name)} (${esc(email)}) שלח/ה בקשה. לאישור: אפליקציית Mercado Bloom באדמין של Shopify.</p>`);
+    } catch (e) { console.error('notify', e); }
+  })();
+  if (ctx?.waitUntil) ctx.waitUntil(after); else await after;
+  return { ok: true, id: appId };
 }
 
 export async function decideApplication(env, id, approve, note = '') {
@@ -125,10 +226,11 @@ export async function decideApplication(env, id, approve, note = '') {
     } catch (e) { console.error('metaobject', e); }
   } else {
     await db.run(
-      `INSERT INTO mb_couriers (application_id, customer_id, email, name, phone, city, areas, vehicle, license, availability)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO mb_couriers (application_id, customer_id, email, name, phone, city, areas, vehicle, license, availability, id_number)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [id, customerId, a.email, a.name, a.phone || '', a.city || '', JSON.stringify(data.areas || []),
-       data.vehicle || '', data.license || '', JSON.stringify({ days: data.days || [], from: data.from || '', to: data.to || '' })]
+       vehicleList(data.vehicles || data.vehicle).join(', '), data.license || '', JSON.stringify({ days: data.days || [], from: data.from || '', to: data.to || '' }),
+       data.id_number || null]
     );
   }
   await db.run(`UPDATE mb_applications SET status='approved', note=?, customer_id=?, decided_at=datetime('now') WHERE id=?`, [note, customerId, id]);
@@ -222,16 +324,17 @@ export async function processOrder(env, order) {
     const p = await db.get('SELECT * FROM mb_products WHERE shopify_product_id = ?', [String(li.product_id)]);
     if (!p) continue;
     const qty = Number(li.quantity || 1);
-    let mode = null; try { mode = JSON.parse(p.data || '{}').shipping || null; } catch { /* legacy */ }
-    // Legacy products had the delivery cost added to the price; new ones sell at the creator's price
-    // and either the client pays delivery at checkout ("paid") or the creator funds it ("free").
-    const unit = mode ? Number(li.price) : Math.max(0, Number(li.price) - Number(p.uplift || 0));
+    let mode = null, cat = ''; try { const pd = JSON.parse(p.data || '{}'); mode = pd.shipping || null; cat = pd.category || ''; } catch { /* legacy */ }
+    // Checkout shipping is always free. "free": the creator funds delivery (uplift is taken from their share).
+    // "paid" and legacy products: the delivery cost (uplift) was added to the site price, so the creator's
+    // part is the price minus the uplift. Paid products saved before this change have uplift 0.
+    const unit = mode === 'free' ? Number(li.price) : Math.max(0, Number(li.price) - Number(p.uplift || 0));
     const cents = Math.round(unit * 100) * qty;
     (perCreator[p.creator_id] ||= { cents: 0, units: 0, free: false });
     perCreator[p.creator_id].cents += cents;
     perCreator[p.creator_id].units += qty;
     if (mode === 'free') perCreator[p.creator_id].free = Math.max(perCreator[p.creator_id].free || 0, Number(p.uplift || 0));
-    lines.push({ title: li.title, variant: li.variant_title || '', qty, creator_id: p.creator_id, product_id: String(li.product_id) });
+    lines.push({ title: li.title, variant: li.variant_title || '', qty, creator_id: p.creator_id, product_id: String(li.product_id), category: cat || li.product_type || '' });
     try { await decrementStock(db, p, li.variant_title || 'Default Title', qty); } catch (e) { console.error('stock', e); }
   }
   const ship = order.shipping_address || order.billing_address || {};
@@ -267,16 +370,17 @@ export async function processOrder(env, order) {
   if (Object.keys(perCreator).length && order.shipping_address) {
     const fee = Math.round((Number(s.courier_fee_ils) || 0) * 100);
     const r = await db.run(
-      `INSERT OR IGNORE INTO mb_deliveries (order_id, order_name, city, address, customer_name, phone, note, fee_cents, deliver_on)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
+      `INSERT OR IGNORE INTO mb_deliveries (order_id, order_name, city, address, customer_name, phone, note, fee_cents, deliver_on, required_vehicle)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
       [orderId, order.name || '', city, JSON.stringify(ship), customerName, ship.phone || order.phone || '', order.note || '', fee,
-       deliveryDay(order.created_at ? new Date(order.created_at) : new Date(), s.weekend_queue !== '0')]
+       deliveryDay(order.created_at ? new Date(order.created_at) : new Date(), s.weekend_queue !== '0'),
+       requiredVehicle(s, lines.map((l) => l.category)) || null]
     );
     if (r.changes) {
       const assigned = s.auto_assign_couriers === '1' ? await autoAssign(env, orderId) : null;
       if (!assigned) {
         await notify(env, s.notify_email, `משלוח בלי שליח: ${order.name || ''} (${city || 'ללא עיר'})`, wrap(
-          `<p>להזמנה ${esc(order.name || '')} לא נמצא/ה שליח/ה שמכסה את ${esc(city || 'העיר')}. יש לשבץ ידנית באפליקציה: Couriers &amp; deliveries.</p>`));
+          `<p>להזמנה ${esc(order.name || '')} לא נמצא/ה שליח/ה שמכסה את ${esc(city || 'העיר')}${requiredVehicle(s, lines.map((l) => l.category)) ? ' עם ' + esc(requiredVehicle(s, lines.map((l) => l.category))) : ''}. יש לשבץ ידנית באפליקציה: Couriers &amp; deliveries.</p>`));
       }
     }
   }
@@ -284,8 +388,8 @@ export async function processOrder(env, order) {
   const deliverOn = deliveryDay(order.created_at ? new Date(order.created_at) : new Date(), s.weekend_queue !== '0');
   for (const cid of Object.keys(perCreator)) {
     try {
-      const creator = await db.get('SELECT id, name, email FROM mb_creators WHERE id = ?', [cid]);
-      await notifyCreatorOrder(env, creator, order, lines.filter((l) => String(l.creator_id) === String(cid)), deliverOn);
+      const creator = await db.get('SELECT id, name, email, phone FROM mb_creators WHERE id = ?', [cid]);
+      await notifyCreatorOrder(env, creator, order, lines.filter((l) => String(l.creator_id) === String(cid)), deliverOn, s);
     } catch (e) { console.error('notify creator', e); }
   }
   return { creators: Object.keys(perCreator).length };
@@ -300,9 +404,10 @@ export async function autoAssign(env, orderId) {
   if (!d || d.courier_id) return null;
   const couriers = await db.all(`SELECT * FROM mb_couriers WHERE status = 'approved'`);
   const city = norm(d.city);
+  // Covers the city, and has the vehicle the products need (when a rule is set in Settings).
   const match = couriers.filter((c) => {
     const areas = JSON.parse(c.areas || '[]').map(norm);
-    return city && (areas.includes(city) || norm(c.city) === city);
+    return city && (areas.includes(city) || norm(c.city) === city) && canCarry(c, d.required_vehicle);
   });
   if (!match.length) return null;
   const loads = {};
