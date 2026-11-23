@@ -166,10 +166,11 @@ export function productEditor(ctx, { product, media, settings, categories = CATE
             <div class="mbp-box" role="radiogroup" aria-labelledby="mbp-ship-l">
               <span class="mbp-label" id="mbp-ship-l">משלוח</span>
               <label class="mbp-radio"><input type="radio" name="shipping" value="free"${ship === 'free' ? ' checked' : ''}>
-                <span><b>משלוח חינם ללקוח – אני מממן/ת</b><small>${ilsAmount(delivery)} להזמנה יורדים מהתשלום שלי. המוצר מסומן "משלוח חינם" באתר.</small></span></label>
+                <span><b>אני מממן/ת את המשלוח</b><small>המחיר באתר = המחיר שלך. ${ilsAmount(delivery)} להזמנה יורדים מהתשלום שלך.</small></span></label>
               <label class="mbp-radio"><input type="radio" name="shipping" value="paid"${ship === 'paid' ? ' checked' : ''}>
-                <span><b>הלקוח משלם משלוח</b><small>${ilsAmount(delivery)} נוספים ללקוח בקופה.</small></span></label>
-              <p class="mbp-tip" data-ship-tip${ship === 'paid' ? '' : ' hidden'}>💡 משלוח חינם מעלה משמעותית את אחוז ההמרה: לקוחות מעדיפים מוצרים עם משלוח חינם ובוחרים בהם על פני יוצרים אחרים באזור. שקלו לגלם את המשלוח במחיר ולהציע משלוח חינם.</p>
+                <span><b>הלקוח משלם את המשלוח</b><small>${ilsAmount(delivery)} מתווספים למחיר המוצר באתר. אתם מקבלים את המחיר שלכם במלואו.</small></span></label>
+              <p class="mbp-help">בשתי האפשרויות המשלוח בקופה תמיד חינם ללקוח והמוצר מסומן "משלוח חינם".</p>
+              <p class="mbp-tip" data-ship-tip${ship === 'paid' ? '' : ' hidden'}>💡 המחיר באתר יהיה גבוה ב-${ilsAmount(delivery)}. לקוחות משווים מחירים: מימון המשלוח בעצמכם שומר על מחיר נמוך יותר מול יוצרים אחרים באזור.</p>
             </div>
             <div class="mbp-field" style="margin:0"><label class="mbp-label" for="mbp-cost">עלות המוצר עבורך – חומרים ואריזה (רשות, לא מוצג ללקוח)</label>
               <input class="mbp-in" id="mbp-cost" name="cost" type="number" min="0" step="1" inputmode="decimal" placeholder="0" value="${esc(d.cost ?? '')}"></div>
@@ -276,6 +277,7 @@ function deliveryCard(ctx, d, actions = true) {
   return `<article class="mbp-delivery">
     <div class="mbp-delivery__head"><b>${esc(d.order_name)} · ${esc(d.city)}</b>${badge(DELIVERY_STATUS, d.status)}</div>
     ${d.deliver_on ? `<div><b>לביצוע ב-<span class="mbp-num">${esc(d.deliver_on.split('-').reverse().join('/'))}</span></b></div>` : ''}
+    ${d.required_vehicle ? `<div class="mbp-tip" style="margin:6px 0"><b>חובה להגיע עם: ${esc(d.required_vehicle)}</b> (לפי סוג המוצרים בהזמנה)</div>` : ''}
     <div>${esc(d.customer_name)}${d.phone ? ` · <a href="tel:${esc(d.phone)}" class="mbp-num">${esc(d.phone)}</a>` : ''}</div>
     <div class="mbp-muted">${esc(addr)}</div>
     ${d.note ? `<div class="mbp-muted">הערה: ${esc(d.note)}</div>` : ''}
@@ -328,6 +330,9 @@ export function courierProfile(ctx, { courier, cities }) {
         <div class="mbp-row" style="margin-top:10px"><div><label class="mbp-label" for="mbp-from">משעה</label><input class="mbp-in" id="mbp-from" type="time" name="from" value="${esc(av.from || '')}"></div>
         <div><label class="mbp-label" for="mbp-to">עד שעה</label><input class="mbp-in" id="mbp-to" type="time" name="to" value="${esc(av.to || '')}"></div></div>
         <div class="mbp-field" style="margin-top:10px"><label class="mbp-label" for="mbp-phone">טלפון</label><input class="mbp-in" id="mbp-phone" name="phone" dir="ltr" value="${esc(courier.phone || '')}"></div>
+        <div class="mbp-field" style="margin-top:10px"><span class="mbp-label">כלי רכב (אפשר לבחור כמה)</span>
+          <div class="mbp-checks" style="max-height:none">${['אופניים', 'קטנוע', 'רכב'].map((v) => `<label class="mbp-check"><input type="checkbox" name="vehicles" value="${v}" data-multi${String(courier.vehicle || '').split(',').map((x) => x.trim()).includes(v) ? ' checked' : ''}> ${v}</label>`).join('')}</div>
+          <p class="mbp-help">משלוחים שדורשים רכב גדול יותר (למשל עציצים גדולים) נשלחים רק למי שיש לו את כלי הרכב המתאים.</p></div>
       </div><button type="submit" class="mbp-btn mbp-btn--block">שמירה</button></div>
     </form>` });
 }

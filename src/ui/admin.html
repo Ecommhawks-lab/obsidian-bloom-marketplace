@@ -87,8 +87,8 @@ const STORE_ADMIN = 'https://admin.shopify.com/store/' + SHOP.replace('.myshopif
 let LANG = (() => { try { return localStorage.getItem('mb_lang') || 'he'; } catch { return 'he'; } })();
 // Labels for application form fields (keys sent by the theme join forms).
 const FL = {
-  he: { categories:'תחום יצירה', business:'שם העסק', business_type:'סוג העסק', business_number:'מספר עוסק / ח.פ.', instagram:'אינסטגרם / תיק עבודות', about:'על היצירה', areas:'אזורי חלוקה', vehicle:'כלי רכב', license:'רישיון נהיגה', days:'ימים זמינים', from:'משעה', to:'עד שעה' },
-  en: { categories:'Craft', business:'Business name', business_type:'Business type', business_number:'Business number', instagram:'Instagram / portfolio', about:'About', areas:'Delivery areas', vehicle:'Vehicle', license:'Driving licence', days:'Available days', from:'From', to:'To' },
+  he: { categories:'תחום יצירה', business:'שם העסק', business_type:'סוג העסק', business_number:'מספר עוסק / ח.פ.', instagram:'אינסטגרם / תיק עבודות', about:'על היצירה', areas:'אזורי חלוקה', vehicle:'כלי רכב', id_number:'תעודת זהות', license:'רישיון נהיגה', days:'ימים זמינים', from:'משעה', to:'עד שעה' },
+  en: { categories:'Craft', business:'Business name', business_type:'Business type', business_number:'Business number', instagram:'Instagram / portfolio', about:'About', areas:'Delivery areas', vehicle:'Vehicles', id_number:'ID number', license:'Driving licence', days:'Available days', from:'From', to:'To' },
 };
 const T = {
   he: { overview:'סקירה', nav_apps:'בקשות הצטרפות', nav_products:'אישור מוצרים', nav_creators:'יוצרים', nav_orders:'הזמנות', nav_couriers:'שליחים ומשלוחים', nav_payouts:'תשלומים', nav_settings:'הגדרות',
@@ -97,7 +97,10 @@ const T = {
     reason:'סיבה (תוצג ליוצר/ת)', note:'הערה (תישלח במייל, רשות)', name:'שם', city:'עיר', email:'אימייל', phone:'טלפון', live:'פעילים', owed:'לתשלום', total:'סה"כ', capacity:'קיבולת יומית', commission:'עמלה %', status:'סטטוס', actions:'פעולות',
     order:'הזמנה', date:'תאריך', delivery:'משלוח', assigned_to:'שליח/ה', auto:'שיבוץ אוטומטי', unassign:'ללא שליח', mark_paid:'סימון כשולם', stripe_pay:'תשלום ב-Stripe', history:'היסטוריית תשלומים', reference:'אסמכתא (מס׳ העברה / Bit)',
     review:'לבדיקה', suspended:'מושהה', active:'פעיל', suspend:'השהיה', activate:'הפעלה', open_store:'החנות', in_shopify:'פתיחה ב-Shopify', site_price:'מחיר באתר', creator_price:'מחיר יוצר/ת', edited:'נערך אחרי אישור',
-    s_commission:'עמלת פלטפורמה (%)', s_uplift:'עלות משלוח להזמנה (₪) – משולמת ע"י הלקוח בקופה, או ע"י היוצר/ת כשמוצע משלוח חינם', s_cats:'קטגוריות מוצרים (שורה לכל קטגוריה; "אחר" נוסף תמיד)', ship_free:'משלוח חינם (היוצר/ת מממן/ת)', ship_paid:'הלקוח משלם משלוח', stock:'מלאי', suggest:'הצעה לקטגוריה חדשה', cost:'עלות ליוצר/ת', s_fee:'תשלום לשליח למשלוח (₪)', s_auto:'שיבוץ אוטומטי של שליחים לפי עיר', s_cap:'סימון "אזל" כשיוצר/ת מגיע/ה לקיבולת היומית', s_weekend:'הזמנות משישי-שבת יוצאות ביום ראשון', deliver_on:'לביצוע ב-', s_email:'אימייל להתראות על בקשות חדשות', s_days:'ימי עסקים לבדיקת בקשה', s_cur:'מטבע תשלומים (Stripe)', resync:'סנכרון רשימת היוצרים', saved:'נשמר', done:'בוצע',
+    s_commission:'עמלת פלטפורמה (%)', s_uplift:'עלות משלוח להזמנה (₪) – מתווספת למחיר המוצר כשהיוצר/ת בוחר/ת "הלקוח משלם", או יורדת מהתשלום ליוצר/ת כשהוא/היא מממנ/ת. בקופה המשלוח תמיד חינם.', s_cats:'קטגוריות מוצרים (שורה לכל קטגוריה; "אחר" נוסף תמיד)', ship_free:'משלוח חינם (היוצר/ת מממן/ת)', ship_paid:'הלקוח משלם משלוח', stock:'מלאי', suggest:'הצעה לקטגוריה חדשה', cost:'עלות ליוצר/ת', s_fee:'תשלום לשליח למשלוח (₪)', s_auto:'שיבוץ אוטומטי של שליחים לפי עיר', s_cap:'סימון "אזל" כשיוצר/ת מגיע/ה לקיבולת היומית', s_weekend:'הזמנות משישי-שבת יוצאות ביום ראשון', deliver_on:'לביצוע ב-', s_email:'אימייל להתראות על בקשות חדשות', s_days:'ימי עסקים לבדיקת בקשה', s_cur:'מטבע תשלומים (Stripe)', resync:'סנכרון רשימת היוצרים', saved:'נשמר', done:'בוצע',
+    docs:'מסמכים', d_business_doc:'תעודת עוסק / רישום עסק', d_id_image:'צילום ת.ז.', d_license_front:'רישיון – קדימה', d_license_back:'רישיון – אחורה', need_vehicle:'נדרש', s_vehicle_rules:'כלי רכב לפי קטגוריה – שורה לכל כלל, למשל "עציצים: רכב". אפשרויות: אופניים, קטנוע, רכב. רכב גדול יותר יכול לקחת גם משלוח קטן.',
+    wa_title:'התראות וואטסאפ (הזמנות בלבד)', s_wa:'שליחת וואטסאפ ליוצר/ת על הזמנה חדשה ולשליח/ה על משלוח חדש', s_wa_c:'שם תבנית ליוצרים (Meta)', s_wa_k:'שם תבנית לשליחים (Meta)', s_wa_lang:'שפת התבנית', wa_off:'וואטסאפ לא מחובר: חסרים WHATSAPP_TOKEN ו-WHATSAPP_PHONE_ID ב-Cloudflare.', wa_test:'שליחת הודעת בדיקה', wa_to:'מספר לבדיקה (למשל 0501234567)',
+    wa_help:'תבנית ליוצרים – 4 משתנים: שם, מספר הזמנה, פריטים, יום הכנה. תבנית לשליחים – 5 משתנים: שם, מספר הזמנה, כתובת, כלי רכב נדרש, יום מסירה.',
     no_stripe:'Stripe לא מוגדר – אפשר לסמן תשלומים ידנית.', no_email:'שליחת אימיילים לא מוגדרת (RESEND_API_KEY / NOTIFY_FROM).', portal_links:'קישורים לאזורים האישיים', areas:'אזורים', delivered:'נמסרו', fee:'תשלום למשלוח (₪, ריק = ברירת מחדל)', products:'מוצרים', earnings:'הכנסות', week:'השבוע', month:'החודש', ytd:'מתחילת השנה', all_orders:'הזמנות',
   },
   en: { overview:'Overview', nav_apps:'Applications', nav_products:'Product approval', nav_creators:'Creators', nav_orders:'Orders', nav_couriers:'Couriers & deliveries', nav_payouts:'Payouts', nav_settings:'Settings',
@@ -106,7 +109,10 @@ const T = {
     reason:'Reason (shown to the creator)', note:'Note (emailed, optional)', name:'Name', city:'City', email:'Email', phone:'Phone', live:'Live', owed:'Owed', total:'Total', capacity:'Daily capacity', commission:'Commission %', status:'Status', actions:'Actions',
     order:'Order', date:'Date', delivery:'Delivery', assigned_to:'Courier', auto:'Auto-assign', unassign:'No courier', mark_paid:'Mark as paid', stripe_pay:'Pay with Stripe', history:'Payout history', reference:'Reference (transfer / Bit no.)',
     review:'To review', suspended:'Suspended', active:'Active', suspend:'Suspend', activate:'Activate', open_store:'Store', in_shopify:'Open in Shopify', site_price:'Site price', creator_price:'Creator price', edited:'Edited after approval',
-    s_commission:'Platform commission (%)', s_uplift:'Delivery cost per order (₪) – paid by the client at checkout, or by the creator when they offer free shipping', s_cats:'Product categories (one per line; "אחר" is always added)', ship_free:'Free shipping (creator pays)', ship_paid:'Client pays delivery', stock:'Stock', suggest:'Suggested new category', cost:'Creator cost', s_fee:'Courier pay per delivery (₪)', s_auto:'Auto-assign couriers by city', s_cap:'Mark creator products sold out at daily capacity', s_weekend:'Friday–Saturday orders go out on Sunday', deliver_on:'Deliver on ', s_email:'Email for new-application alerts', s_days:'Business days to review an application', s_cur:'Payout currency (Stripe)', resync:'Resync creator list', saved:'Saved', done:'Done',
+    s_commission:'Platform commission (%)', s_uplift:'Delivery cost per order (₪) – added to the product price when the creator picks "client pays", or taken from the creator\'s share when they fund it. Checkout shipping is always free.', s_cats:'Product categories (one per line; "אחר" is always added)', ship_free:'Free shipping (creator pays)', ship_paid:'Client pays delivery', stock:'Stock', suggest:'Suggested new category', cost:'Creator cost', s_fee:'Courier pay per delivery (₪)', s_auto:'Auto-assign couriers by city', s_cap:'Mark creator products sold out at daily capacity', s_weekend:'Friday–Saturday orders go out on Sunday', deliver_on:'Deliver on ', s_email:'Email for new-application alerts', s_days:'Business days to review an application', s_cur:'Payout currency (Stripe)', resync:'Resync creator list', saved:'Saved', done:'Done',
+    docs:'Documents', d_business_doc:'Business registration', d_id_image:'ID photo', d_license_front:'Licence – front', d_license_back:'Licence – back', need_vehicle:'Needs', s_vehicle_rules:'Vehicle per category – one rule per line, e.g. "עציצים: רכב". Options: אופניים, קטנוע, רכב. A larger vehicle can also take smaller jobs.',
+    wa_title:'WhatsApp notifications (orders only)', s_wa:'WhatsApp the creator on a new order and the courier on a new delivery', s_wa_c:'Creator template name (Meta)', s_wa_k:'Courier template name (Meta)', s_wa_lang:'Template language', wa_off:'WhatsApp is not connected: WHATSAPP_TOKEN and WHATSAPP_PHONE_ID are missing in Cloudflare.', wa_test:'Send a test message', wa_to:'Test number (e.g. 0501234567)',
+    wa_help:'Creator template – 4 variables: name, order number, items, prepare-by day. Courier template – 5 variables: name, order number, address, required vehicle, delivery day.',
     no_stripe:'Stripe is not configured – payouts can be marked manually.', no_email:'Email sending is not configured (RESEND_API_KEY / NOTIFY_FROM).', portal_links:'Portal links', areas:'Areas', delivered:'Delivered', fee:'Pay per delivery (₪, empty = default)', products:'Products', earnings:'Earnings', week:'This week', month:'This month', ytd:'Year to date', all_orders:'Orders',
   },
 };
@@ -200,13 +206,15 @@ const pages = {
         return `<div class="card app"><div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(a.name)} ${B('info', a.kind === 'courier' ? t('courier') : t('creator'))}</h2>${st(a.status)}</div>
           <p class="muted">${day(a.created_at)}</p>
           <dl>${field(t('email'), a.email)}${field(t('phone'), a.phone)}${field(t('city'), a.city)}
-            ${Object.entries(x).filter(([k]) => !['name', 'email', 'phone', 'city', 'kind', 'terms', 'images'].includes(k)).map(([k, v]) => field((FL[LANG] && FL[LANG][k]) || k, v)).join('')}
+            ${Object.entries(x).filter(([k]) => !['name', 'email', 'phone', 'city', 'kind', 'terms', 'images', 'documents', 'vehicles'].includes(k)).map(([k, v]) => field((FL[LANG] && FL[LANG][k]) || k, v)).join('')}
             ${a.note ? field('note', a.note) : ''}</dl>
+          ${(a.documents || []).length ? `<p style="margin:10px 0 6px"><b>${t('docs')}</b></p><div class="row">${a.documents.map((d) => `<button class="btn" data-doc="${d.id}">📄 ${esc(t('d_' + d.doc_type))}</button>`).join('')}</div>` : ''}
           ${a.images.length ? `<div class="thumbs">${a.images.map((u) => `<a href="${esc(u)}" target="_blank"><img src="${esc(u)}" alt=""></a>`).join('')}</div>` : ''}
           ${a.status === 'pending' ? `<div class="row"><button class="btn primary" data-ok="${a.id}">${t('approve')}</button><button class="btn danger" data-no="${a.id}">${t('reject')}</button></div>` : ''}</div>`;
       }).join('')}</div>` : `<div class="card empty">${t('none')}</div>`);
     app.querySelectorAll('[data-q]').forEach((b) => (b.onclick = () => { const [k, v] = b.dataset.q.split('='); q.set(k, v); go('/applications?' + q.toString()); }));
     app.querySelectorAll('[data-ok]').forEach((b) => (b.onclick = () => act(b, () => api(`/applications/${b.dataset.ok}/approve`, {}))));
+    app.querySelectorAll('[data-doc]').forEach((b) => (b.onclick = () => openDoc(b, b.dataset.doc)));
     app.querySelectorAll('[data-no]').forEach((b) => (b.onclick = async () => { const note = await ask(t('reject'), t('note')); if (note === null) return; act(b, () => api(`/applications/${b.dataset.no}/reject`, { note })); }));
   },
 
@@ -261,7 +269,7 @@ const pages = {
     const opts = (sel) => `<option value="">${t('unassign')}</option>` + cc.couriers.filter((k) => k.status === 'approved').map((k) => `<option value="${k.id}"${k.id === sel ? ' selected' : ''}>${esc(k.name)} (${esc(k.city || '')})</option>`).join('');
     app.innerHTML = head(t('nav_couriers')) +
       `<div class="card"><h2>${t('delivery')}</h2>${dd.deliveries.length ? `<table><tr><th>${t('order')}</th><th>${t('city')}</th><th>${t('status')}</th><th>${t('assigned_to')}</th><th>${t('actions')}</th></tr>
-        ${dd.deliveries.map((x) => `<tr><td>${esc(x.order_name)}<div class="muted">${day(x.created_at)}</div>${x.deliver_on ? `<div class="muted"><b>${t('deliver_on')}${esc(x.deliver_on.split('-').reverse().join('/'))}</b></div>` : ''}</td><td>${esc(x.city)}<div class="muted">${esc([x.address.address1, x.address.address2].filter(Boolean).join(', '))}</div></td><td>${st(x.status)}</td>
+        ${dd.deliveries.map((x) => `<tr><td>${esc(x.order_name)}<div class="muted">${day(x.created_at)}</div>${x.deliver_on ? `<div class="muted"><b>${t('deliver_on')}${esc(x.deliver_on.split('-').reverse().join('/'))}</b></div>` : ''}</td><td>${esc(x.city)}<div class="muted">${esc([x.address.address1, x.address.address2].filter(Boolean).join(', '))}</div>${x.required_vehicle ? `<div>${B('warn', t('need_vehicle') + ': ' + x.required_vehicle)}</div>` : ''}</td><td>${st(x.status)}</td>
           <td>${['unassigned', 'assigned'].includes(x.status) ? `<select data-assign="${x.id}" aria-label="${t('assigned_to')}">${opts(x.courier_id)}</select>` : esc(x.courier_name || '')}</td>
           <td class="row">${x.status === 'unassigned' ? `<button class="btn" data-auto="${x.id}">${t('auto')}</button>` : ''}
             ${x.status !== 'delivered' && x.courier_id ? `<button class="btn" data-del="${x.id}">✓ ${ST.delivered[1]}</button>` : ''}</td></tr>`).join('')}</table>` : `<div class="empty">${t('none')}</div>`}</div>
@@ -302,7 +310,16 @@ const pages = {
         <div class="field"><label for="s-mail">${t('s_email')}</label><input type="email" id="s-mail" name="notify_email" value="${esc(s.notify_email)}"></div>
         <div class="field"><label for="s-cur">${t('s_cur')}</label><input type="text" id="s-cur" name="payout_currency" value="${esc(s.payout_currency)}"></div>
         <div class="field"><label for="s-cats">${t('s_cats')}</label><textarea id="s-cats" name="categories" rows="8">${esc(s.categories || '')}</textarea></div>
+        <div class="field"><label for="s-veh">${t('s_vehicle_rules')}</label><textarea id="s-veh" name="vehicle_rules" rows="4" placeholder="עציצים: רכב">${esc(s.vehicle_rules || '')}</textarea></div>
         ${chk('auto_assign_couriers', 's_auto')}${chk('enforce_capacity', 's_cap')}${chk('weekend_queue', 's_weekend')}<button class="btn primary" type="submit">${t('save')}</button></div>
+        <div class="card"><h2>${t('wa_title')}</h2>${!d.env.whatsapp ? `<div class="banner warn">${t('wa_off')}</div>` : ''}
+          ${chk('whatsapp_enabled', 's_wa')}
+          <div class="field"><label for="s-wac">${t('s_wa_c')}</label><input type="text" id="s-wac" name="wa_template_creator" dir="ltr" value="${esc(s.wa_template_creator || '')}"></div>
+          <div class="field"><label for="s-wak">${t('s_wa_k')}</label><input type="text" id="s-wak" name="wa_template_courier" dir="ltr" value="${esc(s.wa_template_courier || '')}"></div>
+          <div class="field"><label for="s-wal">${t('s_wa_lang')}</label><input type="text" id="s-wal" name="wa_lang" dir="ltr" value="${esc(s.wa_lang || 'he')}"></div>
+          <p class="help">${t('wa_help')}</p>
+          <div class="row"><input type="tel" id="wa-to" dir="ltr" placeholder="${esc(t('wa_to'))}" aria-label="${esc(t('wa_to'))}"><button class="btn" type="button" id="wa-test">${t('wa_test')}</button></div>
+        </div>
         <div class="card"><h2>${t('resync')}</h2><p class="help">"Creators in your area" list on the store (metaobject mb_creator).</p><button class="btn" type="button" id="resync">${t('resync')}</button>
         <p class="help" style="margin-top:14px">App proxy: <code>https://${esc(d.env.shop)}${esc(d.env.proxy)}</code></p></div></form>`;
     document.getElementById('sf').onsubmit = (e) => {
@@ -310,6 +327,7 @@ const pages = {
       f.querySelectorAll('input[name],textarea[name]').forEach((i) => { body[i.name] = i.type === 'checkbox' ? (i.checked ? '1' : '0') : i.value; });
       act(f.querySelector('[type=submit]'), () => api('/settings', body), t('saved'));
     };
+    document.getElementById('wa-test').onclick = (e) => act(e.target, () => api('/whatsapp-test', { to: document.getElementById('wa-to').value }), t('done'));
     document.getElementById('resync').onclick = (e) => act(e.target, async () => { const r = await api('/resync', {}); if (r.errors.length) toast(r.errors.join(' | '), true); return r; });
   },
 };
@@ -327,8 +345,20 @@ async function creatorModal(id) {
   dlg.querySelector('#m-save').onclick = (e) => act(e.target, () => api('/creators/' + id, { capacity_daily: dlg.querySelector('#m-cap').value, commission_pct: dlg.querySelector('#m-com').value, city: dlg.querySelector('#m-city').value })).then(() => dlg.close());
   dlg.querySelector('#m-st').onclick = (e) => act(e.target, () => api('/creators/' + id, { status: c.status === 'approved' ? 'suspended' : 'approved', capacity_daily: c.capacity_daily, commission_pct: c.commission_pct ?? '' })).then(() => dlg.close());
 }
+// Private documents are fetched with the session token and shown from memory (no public link).
+async function openDoc(btn, id) {
+  btn.disabled = true;
+  try {
+    const { document: d } = await api('/documents/' + id);
+    const bin = atob(d.data); const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: d.mime || 'application/octet-stream' }));
+    const body = /^image\//.test(d.mime) ? `<img src="${url}" alt="" style="max-width:100%;border-radius:8px">` : `<iframe src="${url}" title="${esc(d.name || '')}" style="width:100%;height:70vh;border:0"></iframe>`;
+    modal(t('d_' + d.doc_type), body, `<a class="btn" href="${url}" download="${esc(d.name || ('document-' + d.id))}">⬇</a>`);
+  } catch (e) { toast(e.message, true); } finally { btn.disabled = false; }
+}
 function courierModal(k) {
-  const dlg = modal(k.name, `<p class="muted">${esc(k.email)} · ${esc(k.phone || '')} · ${esc(k.vehicle || '')} · ${esc(k.license || '')}</p>
+  const dlg = modal(k.name, `<p class="muted">${esc(k.email)} · ${esc(k.phone || '')} · ${esc(k.vehicle || '')} · ${esc(k.license || '')}${k.id_number ? ' · ' + esc(t('id_number')) + ' ' + esc(k.id_number) : ''}</p>
     <p>${t('areas')}: ${esc(k.areas.join(', ') || k.city)}</p>
     <p class="muted">${esc((k.availability.days || []).join(', '))} ${esc(k.availability.from || '')}–${esc(k.availability.to || '')}</p>
     <div class="field"><label for="k-fee">${t('fee')}</label><input type="number" min="0" id="k-fee" value="${k.fee_ils ?? ''}"></div>`,

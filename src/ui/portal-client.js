@@ -105,12 +105,14 @@
       var cost = Number(($('[name=cost]', form) || {}).value || 0);
       var fee = Math.round(price * commission) / 100;
       var ship = shipMode() === 'free' ? uplift : 0;
+      var site = shipMode() === 'paid' ? price + uplift : price;
       var profit = price - fee - ship - cost;
       function row(label, val, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + label + '</td><td>' + val + '</td></tr>'; }
       body.innerHTML =
-        row('מחיר ללקוח', money(price)) +
+        row('מחיר באתר (כולל משלוח)', money(site)) +
+        (site !== price ? row('המחיר שלך', money(price)) : '') +
         row('עמלת Mercado Bloom (' + commission + '%)', '−' + money(fee)) +
-        row(ship ? 'משלוח חינם (על חשבונך)' : 'משלוח (הלקוח משלם ' + money(uplift) + ')', ship ? '−' + money(ship) : money(0)) +
+        row(ship ? 'משלוח (על חשבונך)' : 'משלוח (כלול במחיר, הלקוח משלם ' + money(uplift) + ')', ship ? '−' + money(ship) : money(0)) +
         row('עלות המוצר', cost ? '−' + money(cost) : money(0)) +
         row('הרווח שלך להזמנה', money(profit), 'is-total' + (profit < 0 ? ' is-neg' : ''));
     }
