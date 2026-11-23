@@ -6,7 +6,7 @@ import { verifySessionToken, ensureOfflineToken, makeAdmin } from '../shopify.mj
 import { makeStripe } from '../stripe.mjs';
 import {
   decideApplication, setCreatorStatus, applyCapacity, assignDelivery, setDeliveryStatus,
-  payout, owed, creatorStats, autoAssign,
+  payout, owed, creatorStats, autoAssign, waReady, sendWhatsApp,
 } from '../logic.mjs';
 
 const api = new Hono();
@@ -63,7 +63,15 @@ api.get('/applications', async (c) => {
   const rows = await db.all(
     `SELECT * FROM mb_applications WHERE (? = '' OR kind = ?) AND (? = 'all' OR status = ?) ORDER BY id DESC LIMIT 200`,
     [kind, kind, status, status]);
-  return c.json({ ok: true, applications: rows.map((r) => ({ ...r, data: J(r.data) || {}, images: J(r.images) || [] })) });
+  const docs = rows.length ? await db.all(`SELECT id, application_id, doc_type, name, mime, size FROM mb_documents WHERE application_id IN (${rows.map(() => '?').join(',')})`, rows.map((r) => r.id)) : [];
+  return c.json({ ok: true, applications: rows.map((r) => ({ ...r, data: J(r.data) || {}, images: J(r.images) || [],
+    documents: docs.filter((d) => d.application_id === r.id) })) });
+});
+// Opens one private application document (ID, licence, business registration) for the store owner.
+api.get('/documents/:id', async (c) => {
+  const d = await makeDb(c.env).get('SELECT id, doc_type, name, mime, data FROM mb_documents WHERE id = ?', [Number(c.req.param('id'))]);
+  if (!d) return fail(c, 'Not found', 404);
+  return c.json({ ok: true, document: d });
 });
 api.post('/applications/:id/:action', async (c) => {
   const { id, action } = c.req.param();
@@ -223,7 +231,7 @@ api.post('/deliveries/:id/assign', async (c) => {
       const db = makeDb(c.env);
       const d = await db.get('SELECT order_id FROM mb_deliveries WHERE id = ?', [c.req.param('id')]);
       const got = d && await autoAssign(c.env, d.order_id);
-      return c.json({ ok: !!got, error: got ? undefined : 'No courier covers this city.' });
+      return c.json({ ok: !!got, error: got ? undefined : 'No courier covers this city (with the vehicle this order needs).' });
     }
     await assignDelivery(c.env, Number(c.req.param('id')), courier_id ? Number(courier_id) : null);
     return c.json({ ok: true });
@@ -240,6 +248,7 @@ api.get('/settings', async (c) => {
   const s = await makeDb(c.env).settings();
   return c.json({ ok: true, settings: s, env: {
     stripe: makeStripe(c.env).enabled, email: !!(c.env.RESEND_API_KEY && c.env.NOTIFY_FROM), proxy: c.env.PROXY_PREFIX || '/apps/mb', shop: c.get('shop'),
+    whatsapp: waReady(c.env),
   } });
 });
 api.post('/settings', async (c) => {
@@ -249,10 +258,19 @@ api.post('/settings', async (c) => {
     if (b[k] === undefined) continue;
     let v = String(b[k]).trim();
     if (['commission_pct', 'uplift_ils', 'courier_fee_ils', 'review_days'].includes(k)) v = String(Math.max(0, Number(v) || 0));
-    if (['auto_assign_couriers', 'enforce_capacity', 'weekend_queue'].includes(k)) v = v === '1' || v === 'true' ? '1' : '0';
+    if (['auto_assign_couriers', 'enforce_capacity', 'weekend_queue', 'whatsapp_enabled'].includes(k)) v = v === '1' || v === 'true' ? '1' : '0';
+    if (['wa_template_creator', 'wa_template_courier'].includes(k)) v = v.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (k === 'wa_lang') v = v.replace(/[^A-Za-z_]/g, '') || 'he';
     await db.setSetting(k, v);
   }
   return c.json({ ok: true });
+});
+// Sends Meta's built-in "hello_world" test template to check the WhatsApp connection.
+api.post('/whatsapp-test', async (c) => {
+  const { to = '' } = await c.req.json().catch(() => ({}));
+  if (!waReady(c.env)) return fail(c, 'WhatsApp is not connected (WHATSAPP_TOKEN / WHATSAPP_PHONE_ID secrets are missing).');
+  const sent = await sendWhatsApp(c.env, to, 'hello_world', 'en_US');
+  return sent ? c.json({ ok: true }) : fail(c, 'WhatsApp did not accept the message. Check the number, the token and the Cloudflare logs.');
 });
 api.post('/resync', async (c) => {
   const db = makeDb(c.env);

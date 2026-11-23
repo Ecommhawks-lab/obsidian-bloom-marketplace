@@ -6,7 +6,7 @@ import { makeDb, categoryList } from '../db.mjs';
 import { verifyProxy, makeAdmin } from '../shopify.mjs';
 import { makeStripe } from '../stripe.mjs';
 import {
-  submitApplication, remainingToday, applyCapacity, creatorStats, setDeliveryStatus, owed,
+  submitApplication, remainingToday, applyCapacity, creatorStats, setDeliveryStatus, owed, vehicleList,
 } from '../logic.mjs';
 import * as V from '../ui/portal.mjs';
 
@@ -83,10 +83,32 @@ proxy.post('/api/upload-target', async (c) => {
   if (!list.length) return jfail(c, 'רק קבצי תמונה עד 20MB');
   try { return c.json({ ok: true, targets: await makeAdmin(c.env).stagedTargets(list) }); } catch (e) { return jfail(c, e, 500); }
 });
+// Private documents for applications (ID, licence, business registration). Kept in the app database,
+// never on a public URL; only the store owner can open them in the admin app.
+const DOC_TYPES = ['business_doc', 'id_image', 'license_front', 'license_back'];
+const DOC_MIME = /^(image\/(jpeg|png|webp|heic|heif)|application\/pdf)$/;
+proxy.post('/api/apply-doc', async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const type = String(b.doc_type || '');
+  const mime = String(b.mime || '').toLowerCase();
+  const data = String(b.data || '').replace(/^data:[^,]*,/, '').replace(/\s+/g, '');
+  if (!DOC_TYPES.includes(type)) return jfail(c, 'סוג מסמך לא מוכר');
+  if (!DOC_MIME.test(mime)) return jfail(c, 'אפשר להעלות תמונה (JPG, PNG) או PDF');
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return jfail(c, 'הקובץ לא נקרא, נסו שוב');
+  const size = Math.floor(data.length * 3 / 4);
+  if (size < 200) return jfail(c, 'הקובץ ריק');
+  if (size > 6 * 1024 * 1024) return jfail(c, 'הקובץ גדול מדי (עד 6MB)');
+  const token = crypto.randomUUID();
+  const db = makeDb(c.env);
+  await db.run('INSERT INTO mb_documents (token, doc_type, name, mime, size, data) VALUES (?,?,?,?,?,?)',
+    [token, type, String(b.name || '').slice(0, 120), mime, size, data]);
+  return c.json({ ok: true, token });
+});
 proxy.post('/api/apply/:kind', async (c) => {
   const body = await c.req.json().catch(() => ({}));
+  let ctx = null; try { ctx = c.executionCtx; } catch { /* tests */ }
   try {
-    await submitApplication(c.env, c.req.param('kind'), body);
+    await submitApplication(c.env, c.req.param('kind'), body, ctx);
     const days = await makeDb(c.env).setting('review_days', '5');
     return c.json({ ok: true, message: `הבקשה התקבלה ותיבדק תוך ${days} ימי עסקים. נעדכן אותך במייל.` });
   } catch (e) { return jfail(c, e); }
@@ -174,24 +196,26 @@ function parseProduct(b, uplift, categories) {
 }
 const toHtml = (t) => t.split(/\n{2,}/).map((p) => `<p>${V.esc(p).replace(/\n/g, '<br>')}</p>`).join('');
 
-async function saveProduct(c, cr, id, b) {
-  const db = makeDb(c.env);
+export async function saveProduct(env, cr, id, b, opts = {}) {
+  const db = makeDb(env);
   const s = await db.settings();
   const delivery = Math.max(0, Number(s.uplift_ils) || 0); // delivery cost (₪) per order
   const existing = id ? await db.get('SELECT * FROM mb_products WHERE id = ? AND creator_id = ?', [id, cr.id]) : null;
   if (id && !existing) throw new Error('המוצר לא נמצא');
   const p = parseProduct(b, delivery, categoryList(s));
-  // Site price = the creator's price. Free shipping: delivery is paid from the creator's share (uplift = cost).
-  // Client pays: delivery is charged at checkout through the paid delivery profile (uplift = 0).
-  p.uplift = p.shipping === 'free' ? delivery : 0;
+  // Shipping at checkout is always free for the client.
+  // "free": the creator funds delivery, it comes out of their share (site price = creator price).
+  // "paid": the client pays delivery inside the product price (site price = creator price + delivery).
+  // In both cases uplift = the delivery cost; processOrder uses it to work out the creator's part.
+  p.uplift = delivery;
   const live = existing && ['approved', 'edited'].includes(existing.status);
   const media = Array.isArray(b.media) ? b.media.filter((u) => /^https:\/\//.test(u)).slice(0, 10) : null;
   if (!existing && (!media || !media.length)) throw new Error('יש להוסיף לפחות תמונה אחת');
-  const add = (v) => v;
-  const result = await makeAdmin(c.env).saveProduct({
+  const add = (v) => (p.shipping === 'paid' ? Number(v) + delivery : Number(v));
+  const result = await makeAdmin(env).saveProduct({
     gid: existing?.shopify_gid || null,
     title: p.title, descriptionHtml: toHtml(p.description), vendor: cr.vendor, productType: p.category,
-    tags: ['mercado-bloom', `creator:${cr.id}`, p.category, ...(p.shipping === 'free' ? ['משלוח-חינם'] : ['משלוח-בתשלום']), ...p.tags],
+    tags: ['mercado-bloom', `creator:${cr.id}`, p.category, 'משלוח-חינם', ...p.tags],
     status: live ? 'ACTIVE' : 'DRAFT',
     price: add(p.price), compareAt: p.compareAt ? add(p.compareAt) : null,
     option: p.option ? { name: p.option.name, values: p.option.values.map((v) => ({ name: v.name, price: add(v.price), compareAt: v.compareAt ? add(v.compareAt) : null, stock: v.stock })) } : null,
@@ -203,11 +227,12 @@ async function saveProduct(c, cr, id, b) {
     ],
   });
   let warning = '';
-  try { await makeAdmin(c.env).setDeliveryMode(result.variantIds, p.shipping === 'paid', delivery); }
+  // Every product ships free at checkout: keep its variants in the store's default (free) delivery profile.
+  try { await makeAdmin(env).setDeliveryMode(result.variantIds, false, delivery); }
   catch (e) { console.error('delivery profile', e); warning = ' (הגדרת המשלוח תושלם על ידינו)'; }
-  const status = live ? 'edited' : 'pending';
+  const status = opts.keepStatus && existing ? existing.status : live ? 'edited' : 'pending';
   const data = JSON.stringify({ description: p.description, category: p.category, categorySuggest: p.suggest, tags: p.tags, price: p.price,
-    compareAt: p.compareAt, option: p.option, stock: p.stock, shipping: p.shipping, cost: p.cost });
+    compareAt: p.compareAt, option: p.option, stock: p.stock, shipping: p.shipping, cost: p.cost, ship_v: 2 });
   if (existing) {
     await db.run(`UPDATE mb_products SET title=?, data=?, creator_price=?, list_price=?, image_url=COALESCE(?, image_url), handle=?, status=?, reject_reason=NULL, updated_at=datetime('now') WHERE id=?`,
       [p.title, data, p.price, add(p.price), result.image, result.handle, status, existing.id]);
@@ -218,13 +243,34 @@ async function saveProduct(c, cr, id, b) {
   }
   return (live ? 'השינויים נשמרו ומופיעים באתר' : 'המוצר נשמר ונשלח לאישור') + warning;
 }
+// One-time move (cron): products saved as "client pays shipping" before shipping went into the price.
+// Re-saves them so the site price includes the delivery cost and checkout shipping is free.
+export async function migratePaidShipping(env) {
+  const db = makeDb(env);
+  if (await db.setting('paid_ship_v2', '')) return 0;
+  let n = 0;
+  for (const row of await db.all(`SELECT * FROM mb_products WHERE shopify_gid IS NOT NULL AND status != 'rejected'`)) {
+    let d; try { d = JSON.parse(row.data || '{}'); } catch { continue; }
+    if (d.shipping !== 'paid' || d.ship_v) continue;
+    const cr = await db.get('SELECT * FROM mb_creators WHERE id = ?', [row.creator_id]);
+    if (!cr) continue;
+    try {
+      await saveProduct(env, cr, row.id, { title: row.title, description: d.description || '', category: d.category, categorySuggest: d.categorySuggest,
+        tags: (d.tags || []).join(', '), price: d.price ?? row.creator_price, compareAt: d.compareAt, option: d.option, stock: d.stock,
+        shipping: 'paid', cost: d.cost }, { keepStatus: true });
+      n++;
+    } catch (e) { console.error('migrate paid shipping', row.id, e); return n; } // retried next hour
+  }
+  await db.setSetting('paid_ship_v2', new Date().toISOString());
+  return n;
+}
 proxy.post('/api/creator/products', async (c) => {
   const cr = await apiGate(c, 'creator'); if (!cr) return c.res;
-  try { return c.json({ ok: true, message: await saveProduct(c, cr, null, await c.req.json()) }); } catch (e) { return jfail(c, e); }
+  try { return c.json({ ok: true, message: await saveProduct(c.env, cr, null, await c.req.json()) }); } catch (e) { return jfail(c, e); }
 });
 proxy.post('/api/creator/products/:id', async (c) => {
   const cr = await apiGate(c, 'creator'); if (!cr) return c.res;
-  try { return c.json({ ok: true, message: await saveProduct(c, cr, Number(c.req.param('id')), await c.req.json()) }); } catch (e) { return jfail(c, e); }
+  try { return c.json({ ok: true, message: await saveProduct(c.env, cr, Number(c.req.param('id')), await c.req.json()) }); } catch (e) { return jfail(c, e); }
 });
 proxy.post('/api/creator/products/:id/archive', async (c) => {
   const cr = await apiGate(c, 'creator'); if (!cr) return c.res;
@@ -325,8 +371,10 @@ proxy.post('/api/courier/profile', async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const areas = (Array.isArray(b.areas) ? b.areas : []).map(String).slice(0, 250);
   const availability = { days: Array.isArray(b.days) ? b.days : [], from: String(b.from || ''), to: String(b.to || '') };
-  await makeDb(c.env).run('UPDATE mb_couriers SET areas = ?, availability = ?, phone = ? WHERE id = ?',
-    [JSON.stringify(areas), JSON.stringify(availability), String(b.phone || k.phone || '').slice(0, 30), k.id]);
+  const vehicles = vehicleList(b.vehicles);
+  if (Array.isArray(b.vehicles) && !vehicles.length) return jfail(c, 'יש לבחור לפחות כלי רכב אחד');
+  await makeDb(c.env).run('UPDATE mb_couriers SET areas = ?, availability = ?, phone = ?, vehicle = ? WHERE id = ?',
+    [JSON.stringify(areas), JSON.stringify(availability), String(b.phone || k.phone || '').slice(0, 30), vehicles.length ? vehicles.join(', ') : (k.vehicle || ''), k.id]);
   return c.json({ ok: true, message: 'נשמר' });
 });
 proxy.post('/api/courier/stripe', async (c) => {
